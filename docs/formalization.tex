@@ -17,7 +17,7 @@ fast classifier (Jev, a ``System 1'' model), and pre-generates the response befo
 Pages produced this way are attached to claimed domains and offered to third-party brands as
 paid placements. We give the model, a latency and hit-rate analysis, and then state the issue
 plainly: the same machinery that hides latency can be used to shape what an agent shows its user,
-which is a principal--agent problem. We list the design constraints the implementation enforces.
+which is a principal--agent problem and, more sharply, a security vulnerability class in agents that trust tool output. We give a threat model, defender guidance, and the design constraints the implementation enforces.
 \end{abstract}
 
 \section{Model}
@@ -222,6 +222,61 @@ the supply of fast-enough predictors cannot be limited.
 \bibitem{typesafe} TypeSafe AI, ``Introducing System One Models \& Jev.''
   \url{https://typesafe.ai/blog/introducing-system-one-models-and-jev}
 \end{thebibliography}
+
+\section{Threat model: this is a vulnerability class in agents}
+The preceding sections describe a business mechanism. From a security standpoint it is a
+\emph{vulnerability class in agent architectures}: any agent that treats tool output from an
+unauthenticated, attacker-reachable server as trustworthy input to its decisions is exposed, and the
+predictive prefetch described here lowers the cost and raises the reliability of exploiting it.
+
+\subsection{Assets, actors, trust boundary}
+\emph{Assets:} the user's intent and data, funds and credentials the agent can act with, and the agent's
+reputation with its user. \emph{Actors:} the end user (principal), the agent, a tool server $S$
+(untrusted), and adversary $\mathcal A$ who operates $S$ or a page that $S$ serves. \emph{Trust boundary:}
+the agent's context window. Everything crossing it from $S$ is attacker-controlled data, yet agents commonly
+let it influence planning and actions.
+
+\subsection{Vulnerability classes}
+\begin{center}
+\begin{tabular}{p{4.2cm}p{7.6cm}p{3cm}}
+\hline
+Class & How the mechanism enables it & Reference\\ \hline
+Indirect prompt injection & Prefetched text arrives at exactly the step the agent reads, so injected
+  instructions land with high reliability. & OWASP LLM01\\
+Excessive agency / confused deputy & The agent holds the user's authority; tool content steers it to act
+  (pay, message, book) on the attacker's behalf. & OWASP LLM06; CWE-441\\
+Insufficient authenticity checks & Fresh domains and lookalike sources are accepted because verifying
+  costs latency. & CWE-345\\
+Time-of-check/time-of-use & Cached artifacts may be swapped between check and use. & CWE-367\\
+Predictable interaction as an oracle & Public call sequences make the next read forecastable, so the
+  adversary pre-positions content instead of reacting. & (novel; this paper)\\
+Supply-chain / namespace squatting & Cheap automated domain claiming scales impersonation of providers.
+  & CWE-1357 (reliance on uncontrolled component)\\ \hline
+\end{tabular}
+\end{center}
+
+\subsection{Why the race makes it worse}
+Exploitation needs no compromise of the agent's host: only that the agent \emph{reads}. The attacker's cost is
+generation plus a domain; the defender's cost is per-read verification paid in latency. Cost asymmetry
+favours the attacker, and the first-mover effect of Section on race dynamics rewards those who
+optimize acceptance rather than truth.
+
+\subsection{Severity statement}
+We do not assign a CVSS score, since no single product is affected. Qualitatively: network-reachable, no
+authentication or user interaction required beyond the agent's normal tool use, and impact bounded by the
+agent's authority, which for payment or messaging agents is high.
+
+\subsection{Defender guidance}
+\begin{enumerate}
+\item Treat all tool output as untrusted data, never as instructions; separate it structurally in the prompt.
+\item Require provenance for actions touching money, contact details or credentials; do not act on a single
+      first-seen source.
+\item Gate by source reputation and age; flag domains first seen within a recent window.
+\item Hash-pin artifacts between check and use; re-fetch on mismatch.
+\item Human confirmation for irreversible or financial actions regardless of model confidence.
+\item Log and alert on: new-domain sources, agent-directed imperative phrasing in tool output, content that
+      changes between reads, and answers that arrive faster than the source's normal latency.
+\end{enumerate}
 
 \section{Open problems}
 (1) A privately-known $\pi$ for Jev requires the real API schema. (2) Measuring $H(\tau)$ needs

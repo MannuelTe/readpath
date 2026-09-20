@@ -37,6 +37,17 @@ Full version: [`docs/formalization.tex`](docs/formalization.tex).
   the read path; each 10x of speed at acceptable quality lets an operator pre-position more. So the risks follow
   the speed-quality frontier, not Jev, and defences belong on the receiving side.
 
+## Security: this is a vulnerability class in agents
+Any agent that trusts tool output from an unauthenticated server is exposed, and predictive prefetch makes
+exploitation cheaper and more reliable (content lands exactly when the agent reads).
+- **Maps to:** indirect prompt injection (OWASP LLM01), excessive agency / confused deputy (LLM06, CWE-441),
+  weak authenticity checks (CWE-345), TOCTOU (CWE-367), namespace squatting at scale.
+- **Why it scales:** the attacker pays generation + a domain; the defender pays per-read verification in
+  latency. No compromise of the agent host is needed, only that it reads.
+- **Defenders:** treat tool output as data, require provenance for money/contact actions, gate new domains,
+  hash-pin artifacts, human-confirm irreversible actions, alert on content that changes between reads.
+  Full threat model in [`docs/formalization.tex`](docs/formalization.tex).
+
 ## Architecture
 | File | Role |
 |---|---|
