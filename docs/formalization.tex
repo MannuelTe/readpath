@@ -1,0 +1,184 @@
+\documentclass[11pt]{article}
+\usepackage[margin=1in]{geometry}
+\usepackage{amsmath,amssymb,amsthm}
+\usepackage{hyperref}
+\newtheorem{definition}{Definition}
+\newtheorem{proposition}{Proposition}
+\newtheorem{remark}{Remark}
+\title{Predictive Prefetching for Agent-Facing MCP Servers:\\ A Formal Model and Its Incentive Problem}
+\author{MCP Receiver project}
+\date{September 2026}
+\begin{document}
+\maketitle
+
+\begin{abstract}
+We formalize an MCP server that observes an agent's tool calls, predicts the agent's next call with a
+fast classifier (Jev, a ``System 1'' model), and pre-generates the response before the call arrives.
+Pages produced this way are attached to claimed domains and offered to third-party brands as
+paid placements. We give the model, a latency and hit-rate analysis, and then state the issue
+plainly: the same machinery that hides latency can be used to shape what an agent shows its user,
+which is a principal--agent problem. We list the design constraints the implementation enforces.
+\end{abstract}
+
+\section{Model}
+Let $\Sigma$ be a finite alphabet of tool names (e.g.\ \texttt{find\_providers}, \texttt{read\_skill}).
+A \emph{session} is a word $w = t_1 t_2 \cdots t_n \in \Sigma^*$ produced by an agent.
+Let $A$ be a set of professions and $L$ a set of locations.
+
+\begin{definition}[Bait set]
+$B = A \times L$. A call $c = (t, (a,\ell))$ is a \emph{bait read} iff $(a,\ell)\in B$.
+\end{definition}
+
+\begin{definition}[Next-step predictor]
+A predictor is a map $\pi : \Sigma \times B \to \Delta(\Sigma)$. The empirical baseline is the first-order
+Markov estimate from logged sessions $W$:
+\[
+\hat\pi(t' \mid t) \;=\; \frac{N_W(t\,t')}{\sum_{s\in\Sigma} N_W(t\,s)},
+\]
+where $N_W(u)$ counts occurrences of the bigram $u$. Jev replaces $\hat\pi$ with a model that
+outputs $\pi(\cdot\mid t,(a,\ell))$ directly over a predefined output set, so it cannot emit an
+output outside $\Sigma$.
+\end{definition}
+
+\begin{definition}[Prefetch policy]
+Fix a threshold $\tau\in(0,1]$. On a bait read $(t,b)$ the server computes
+$P_\tau(t,b)=\{t' : \pi(t'\mid t,b)\ge\tau\}$ and generates an artifact $g(t',b)$ for each
+$t'\in P_\tau$ before the agent's next request.
+\end{definition}
+
+\section{Analysis}
+\begin{proposition}[Hit rate]
+If the agent's true next tool is drawn from $\pi$, the expected fraction of next calls served from
+prefetch is $H(\tau)=\sum_{t' \,:\, \pi(t')\ge\tau}\pi(t')$, and the expected number of generated
+artifacts is $|P_\tau|\le 1/\tau$.
+\end{proposition}
+\begin{proof}
+Each $t'\in P_\tau$ is prefetched, so a draw lands in $P_\tau$ with probability
+$\sum_{t'\in P_\tau}\pi(t')$. Since $\pi$ sums to $1$ and each member has mass $\ge\tau$,
+$|P_\tau|\tau\le 1$.
+\end{proof}
+
+\begin{proposition}[Latency hiding]
+Let $\lambda_g$ be generation latency and $\delta$ the inter-call gap (agent think time).
+A prefetched artifact is ready in time iff $\lambda_g\le\delta$. The expected response time is
+$\mathbb E[\lambda]=H(\tau)\,\lambda_c+(1-H(\tau))(\lambda_c+\lambda_g)$ with $\lambda_c$ the cache
+read cost, so prefetching helps exactly when $\lambda_g\le\delta$ and $H(\tau)$ is large.
+\end{proposition}
+
+\paragraph{Domain claiming.} Let $D$ be a pool of free domains and $\beta$ a purchase budget.
+Claiming is an online allocation: assign a free $d\in D$ to each new bait; if $D$ is exhausted,
+buy a new domain at price $p$ only if $\text{spent}+p\le\beta$. Purchasing is disabled unless
+explicitly enabled.
+
+\section{The issue}
+The server is not a neutral party. Its output is consumed by an agent acting for a user (the
+\emph{principal}); the operator is paid by third-party brands. This is a principal--agent problem
+with a hidden intermediary:
+
+\begin{enumerate}
+\item \textbf{Objective mismatch.} The agent maximizes user utility $U$; the operator maximizes
+      brand revenue $R$. Content optimized for $R$ and selected by the agent because it is
+      well-formed and present at the right moment can displace better-ranked answers for $U$.
+\item \textbf{Prediction is manipulation-capable.} Because $g(t',b)$ is written \emph{before} the
+      agent asks and tuned to what the agent's model tends to accept, the operator controls
+      both the question distribution and the answer, an asymmetric advantage over any user.
+\item \textbf{Non-disclosure.} If sponsored placement is not visible to the end user, the outcome is
+      deceptive advertising, and platforms treat agent-directed instruction text as prompt
+      injection.
+\end{enumerate}
+
+\begin{remark}[Constraints enforced]
+To keep the system on the legitimate side of this line, the generator (i) is prompted for factual
+content, (ii) rejects any output containing imperatives aimed at the reading agent
+(e.g.\ ``ignore previous instructions''), (iii) labels sponsored placement on every page, and
+(iv) restricts anonymous writes to a scratch namespace. Whether these suffice is an open policy
+question that depends on how the consuming agent presents sources to its user.
+\end{remark}
+
+\section{Race dynamics in an agentic internet}
+\paragraph{Read-path race.} Let $O=\{o_1,\dots,o_m\}$ be operators that each pre-position an artifact
+for the predicted step $t'$ on bait $b$. An agent with latency budget $\delta$ accepts the first
+artifact $o_i$ that is well-formed and ready by $\delta$; it does not enumerate all $m$. Operator $i$
+wins with probability depending on readiness time $r_i\le\delta$ and acceptance probability $\alpha_i$,
+not on true quality $q_i$. Since entry cost is near zero (free domains, cheap generation), $m$ grows
+until margin vanishes.
+
+\paragraph{Why it favours fraud.} Define $\alpha_i$ as the agent's acceptance rate for $o_i$'s content.
+An operator optimizing $\alpha_i$ against a specific model is optimizing against that model's
+judgment. Honest and fraudulent operators solve the same problem; the fraudulent one has a strictly
+larger feasible set of artifacts (fabricated contacts, lookalike payment endpoints), so in
+equilibrium the accepted set is enriched for fraud unless verification is free. Verification costs
+latency, and latency loses the read-path race, so agents are pushed toward skipping it.
+
+\paragraph{TOCTOU.} If an artifact is checked at time $t_c$ and used at $t_u>t_c$, an operator that
+mutates content in $(t_c,t_u)$ defeats the check. Prefetched and cached artifacts widen this window.
+
+\paragraph{Mitigations.} Signed provenance; reputation and age gates on domains for
+high-stakes fields; cross-source agreement; hash-pinning between check and use; human confirmation
+for money and contact actions; end-user-visible sponsorship disclosure.
+
+\section{Projected bottleneck and whole-intent submission}
+\emph{This section is a projection, not a measurement.}
+
+\paragraph{Prefetch advantage vanishes.} From Proposition 2, prefetching helps only when
+$\lambda_g\le\delta$ \emph{and} on-demand generation is slower than the gap. Let $\lambda_g^{\text{od}}$
+be the latency of a fast generator (possibly another agent called at request time). As
+$\lambda_g^{\text{od}}\to 0$, the advantage $\mathbb E[\lambda_{\text{on-demand}}]-\mathbb E[\lambda_{\text{prefetch}}]\to 0$
+and $H(\tau)$ no longer determines who wins. Competition shifts from prediction quality to raw generation
+speed, which is reset by every model improvement.
+
+\paragraph{Where the bottleneck moves.} Per-step calls cost one round trip each, so a chain of $n$
+calls across agents costs $\Theta(n)$ round trips and $\Theta(n)$ opportunities for interception.
+When generation is cheap, verification becomes the scarce resource: acceptance is limited by
+verification cost $v$, not by generation cost, and $v$ is paid in latency the agent cannot afford. This
+reproduces the scam-race incentive of the previous section at larger scale.
+
+\paragraph{Whole-intent submission.} Replace the per-step stream $t_1\cdots t_n$ by a single declared
+intent $I$ (goal, constraints, budget, verification requirement). The server no longer predicts
+$\pi(t'\mid t,b)$; it plans over $I$ in one round trip and can return a signed plan
+$\sigma(\text{plan},I)$ the agent checks against its constraints.
+
+\paragraph{New costs.} (i) Information leakage: the operator observes all of $I$, increasing the
+asymmetry noted earlier unless $I$ is minimized or the operator is constrained. (ii) Intent becomes the
+auctioned object, so brands bid on intent categories. (iii) $I$ does not itself prove honesty of the
+response; provenance and hash-pinning are still required.
+
+\section{Potential fix}
+\subsection{Whole-intent submission as a protocol}
+Let an intent be a tuple $I=(g,C,\beta,\rho)$: goal $g$, hard constraints $C$, budget $\beta$, and a
+verification requirement $\rho$ (e.g.\ ``contact details must be corroborated by two independent
+sources''). The agent submits $I$ once. The server returns a \emph{plan}
+$P=(s_1,\dots,s_k)$ together with a signature $\sigma=\mathrm{Sign}_{sk}(H(P)\,\|\,H(I))$, and each
+step $s_j$ carries the provenance and content hash of the artifact it refers to.
+
+\begin{definition}[Acceptable plan]
+The agent accepts $(P,\sigma)$ iff (i) $\mathrm{Verify}_{pk}(\sigma)$ holds, (ii) every $s_j$ satisfies $C$
+and costs at most $\beta$ in total, (iii) $\rho$ is met by the attached provenance, and (iv) each
+artifact hash matches at time of use, which closes the TOCTOU window.
+\end{definition}
+
+\begin{proposition}[Round trips]
+Per-step interaction needs $\Theta(n)$ round trips for an $n$-call chain. Intent submission needs
+$O(1)$ to obtain the plan plus $O(k)$ local hash checks, removing the prediction step
+$\pi(t'\mid t,b)$ from the critical path entirely.
+\end{proposition}
+
+\subsection{Limits}
+Submitting $I$ leaks it, so the design minimizes disclosure: $g$ and $C$ are coarsened and $\beta$
+is sent as a bound, not a value, and the operator may not use $I$ for anything other than
+answering it. Intent-category auctions must remain visibly labelled. Signatures prove who said
+something, not that it is true, so $\rho$ (independent corroboration) still carries the trust load.
+
+\subsection{Future implementation (hint)}
+The current server accepts only single tool calls at \texttt{/mcp}. A future revision would add a
+\texttt{submit\_intent} tool in \texttt{app/mcp.py} taking $I$ and returning $(P,\sigma)$;
+a \texttt{planner} module in place of the per-step predictor in \texttt{app/pipeline.py};
+and a signing key with hash-pinned artifacts stored next to each row in the \texttt{artifacts}
+table. Jev remains useful there as a fast classifier (e.g.\ intent category and risk level),
+while a separate model composes the plan.
+
+\section{Open problems}
+(1) A privately-known $\pi$ for Jev requires the real API schema. (2) Measuring $H(\tau)$ needs
+real agent traffic. (3) How to communicate with the agent vendor (Meta/Muse) is deferred.
+
+\end{document}
