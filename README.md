@@ -37,6 +37,13 @@ Full version: [`docs/formalization.tex`](docs/formalization.tex).
   the read path; each 10x of speed at acceptable quality lets an operator pre-position more. So the risks follow
   the speed-quality frontier, not Jev, and defences belong on the receiving side.
 
+## Figures
+![Read-path race timeline](docs/figures/fig1-read-path-race.svg)
+*Figure 1. A fast predictor pre-generates the agent's next read before the agent asks (t2 < t3). Verification is skipped because it costs latency.*
+
+![Classical race vs. agent read-path race](docs/figures/fig2-vs-classical-race.svg)
+*Figure 2. Same check/gap/use shape as a classical TOCTOU race, but the timing is exploited deliberately and there is no scheduler to fix.*
+
 ## Security: this is a vulnerability class in agents
 Any agent that trusts tool output from an unauthenticated server is exposed, and predictive prefetch makes
 exploitation cheaper and more reliable (content lands exactly when the agent reads).
