@@ -1,4 +1,6 @@
-# MCP Receiver
+# Readpath
+
+> The race to be the first thing an agent reads: predictive prefetch, incentive risk and verification for agent-facing MCP servers.
 
 A mid-latency Python MCP server with a database, a Jev-driven next-step predictor, and
 pre-generated content pages that can be offered to brands as sponsored placements.
