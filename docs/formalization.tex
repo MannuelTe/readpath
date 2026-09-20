@@ -177,6 +177,52 @@ and a signing key with hash-pinned artifacts stored next to each row in the \tex
 table. Jev remains useful there as a fast classifier (e.g.\ intent category and risk level),
 while a separate model composes the plan.
 
+\section{Evidence for Jev's speed, and generalization}
+\subsection{What is actually known}
+All available figures are vendor claims or individual developer reports; \emph{none are independently verified}.
+\begin{itemize}
+\item TypeSafe reports response times of 70--500\,ms and input pricing of \$0.042 per million tokens; its accuracy
+      reference is the average of two frontier models' answers, and the evaluations come from the start-up itself
+      \cite{heise}.
+\item Reported relative speed-ups: ``20--200$\times$ faster'' and ``40--400$\times$ cheaper'' with no named baselines
+      \cite{latentspace}; developer reports of 5--18$\times$ (safety classification) and 10--20$\times$ versus Gemini
+      (email classification), where Gemini was slightly more accurate but Jev returned confidence scores
+      \cite{techcrunch}.
+\item Vendor announcement and docs: \cite{typesafe}. Jev cannot emit free-form text, so speed comparisons to general LLMs
+      hold only for closed-output classification and routing tasks.
+\end{itemize}
+
+\subsection{Abstraction: any sufficiently fast, acceptably good model}
+Let a model $M$ have latency $\lambda_M$, task accuracy $a_M$, and cost $c_M$. Fix an acceptability
+threshold $a^\ast$ (the accuracy at which the predictor's output is useful) and the agent's latency budget
+$\delta$. Define the \emph{inline-feasible set}
+\[
+\mathcal F=\{M : a_M\ge a^\ast \;\wedge\; \lambda_M\le \varepsilon\,\delta\},\qquad \varepsilon\ll 1 .
+\]
+\begin{proposition}[Generality]
+If $M\in\mathcal F$, the prediction step adds at most $\varepsilon\delta$ to the critical path, so the
+prefetch/on-demand race of the earlier sections is available to any operator using $M$. If $M'$ is $k$ times faster
+than $M$ at equal $a\ge a^\ast$, the extra room $\delta(\varepsilon-\varepsilon/k)$ can be spent on
+more candidate steps ($|P_\tau|$ larger at smaller $\tau$) or on generation, so each order of magnitude
+of speed at acceptable quality strictly enlarges what an operator can pre-position inside $\delta$.
+\end{proposition}
+Nothing in this depends on Jev's architecture. Autoregressive small models, distilled classifiers, or
+non-autoregressive systems all qualify once $a_M\ge a^\ast$ and $\lambda_M$ is small. Jev is one instance of the
+speed--quality frontier moving; the behaviour described in this paper follows from the frontier, not from the
+vendor. Consequently defences must be placed on the receiving side (provenance, verification, disclosure), because
+the supply of fast-enough predictors cannot be limited.
+
+\begin{thebibliography}{9}
+\bibitem{heise} heise online, ``AI model Jev to make machines decide faster,'' Sept.\ 2026.
+  \url{https://www.heise.de/en/news/AI-model-Jev-to-make-machines-decide-faster-11457071.html}
+\bibitem{latentspace} Latent Space, ``[AINews] Jev: a System One Model\dots,'' Sept.\ 2026.
+  \url{https://www.latent.space/p/ainews-jev-a-system-one-model-that}
+\bibitem{techcrunch} TechCrunch, ``A new kind of AI model from a ChatGPT inventor is thrilling developers,'' 18 Sept.\ 2026.
+  \url{https://techcrunch.com/2026/09/18/a-new-kind-of-ai-model-from-a-chatgpt-inventor-is-thrilling-developers/}
+\bibitem{typesafe} TypeSafe AI, ``Introducing System One Models \& Jev.''
+  \url{https://typesafe.ai/blog/introducing-system-one-models-and-jev}
+\end{thebibliography}
+
 \section{Open problems}
 (1) A privately-known $\pi$ for Jev requires the real API schema. (2) Measuring $H(\tau)$ needs
 real agent traffic. (3) How to communicate with the agent vendor (Meta/Muse) is deferred.

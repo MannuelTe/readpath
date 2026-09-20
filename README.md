@@ -25,6 +25,16 @@ Full version: [`docs/formalization.tex`](docs/formalization.tex).
   requirement) and receive a signed plan with hash-pinned artifacts: one round trip, no prediction,
   closes the check/use gap. Planned as a future `submit_intent` tool + planner module; not implemented yet.
 
+- **Jev's speed (unverified vendor claims):** 70-500 ms responses, $0.042/M input tokens
+  ([heise](https://www.heise.de/en/news/AI-model-Jev-to-make-machines-decide-faster-11457071.html));
+  "20-200x faster" ([Latent Space](https://www.latent.space/p/ainews-jev-a-system-one-model-that));
+  developer reports of 5-20x vs. frontier LLMs, Gemini slightly more accurate
+  ([TechCrunch](https://techcrunch.com/2026/09/18/a-new-kind-of-ai-model-from-a-chatgpt-inventor-is-thrilling-developers/));
+  [announcement](https://typesafe.ai/blog/introducing-system-one-models-and-jev). No independent benchmark exists yet.
+- **Generalization:** any model with accuracy >= a threshold and latency well under the agent's budget can sit in
+  the read path; each 10x of speed at acceptable quality lets an operator pre-position more. So the risks follow
+  the speed-quality frontier, not Jev, and defences belong on the receiving side.
+
 ## Architecture
 | File | Role |
 |---|---|
