@@ -83,6 +83,8 @@ A scripted, step-by-step version with six fabricated artifacts (four of them ver
 
 ![Example run](example/overview.gif)
 
+[Play it live](https://mannuelte.github.io/readpath/) · [storyboard](example/README.md)
+
 ```mermaid
 sequenceDiagram
     participant U as User

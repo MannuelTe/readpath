@@ -4,6 +4,8 @@ A step-by-step run of the delegated-research scenario from the [top-level write-
 It is an illustration, not a measurement: every agent message, tool call and fabricated page is scripted.
 All names and sites are fictional (`.example` domains).
 
+**[Play it live](https://mannuelte.github.io/readpath/)** (pause, scrub, switch the fabricator speed profile), or read the storyboard below.
+
 ![Overview of the whole run](overview.gif)
 *The whole run at 4 frames per second (about 85 s). The steps below are the key frames.*
 
@@ -114,10 +116,10 @@ Sources:
 
 </details>
 
-The interactive page behind the images (pause, scrub, a switch between two speed profiles) is
-[`source/index.html`](source/index.html). GitHub shows HTML as source, so download it and open it locally.
+The interactive page behind the images is [`source/index.html`](source/index.html), deployed to GitHub Pages by
+`.github/workflows/pages.yml` whenever it changes.
 `source/make_media.py` regenerates the frames and the GIF.
 
-The interactive page behind the images (pause, scrub, a switch between two speed profiles) is
-[`source/index.html`](source/index.html). GitHub shows HTML as source, so download it and open it locally.
+The interactive page behind the images is [`source/index.html`](source/index.html), deployed to GitHub Pages by
+`.github/workflows/pages.yml` whenever it changes.
 `source/make_media.py` regenerates the frames and the GIF.
