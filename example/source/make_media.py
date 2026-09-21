@@ -1,6 +1,8 @@
-"""Maintainer script: builds the key frames and the overview GIF from index.html.
-Not needed to read the example. Needs playwright, Google Chrome and ffmpeg.
-Usage: python3 make_media.py"""
+"""Build the storyboard frames and overview GIF from ``index.html``.
+
+This maintainer script is not required to view the example. It requires Playwright, Google Chrome,
+and FFmpeg. Run it with ``python3 make_media.py``.
+"""
 import subprocess, tempfile, pathlib, json
 from playwright.sync_api import sync_playwright
 
@@ -37,4 +39,4 @@ with tempfile.TemporaryDirectory() as tmp, sync_playwright() as p:
     subprocess.run(["ffmpeg", "-y", "-loglevel", "error", "-framerate", str(GIF_FPS), "-i", f"{tmp}/f%05d.png",
                     "-vf", f"{vf},split[a][b];[a]palettegen=max_colors=96[p];[b][p]paletteuse=dither=none",
                     str(out / "overview.gif")], check=True)
-print("done")
+print("Media generation complete.")

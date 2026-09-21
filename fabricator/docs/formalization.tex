@@ -5,212 +5,290 @@
 \newtheorem{definition}{Definition}
 \newtheorem{proposition}{Proposition}
 \newtheorem{remark}{Remark}
-\title{Predictive Prefetching for Agent-Facing MCP Servers:\\ A Formal Model and Its Incentive Problem}
+\title{Predictive Prefetching on the Agent Read Path:\\ A Formal Model, Incentive Analysis, and Threat Model}
 \author{Readpath project}
 \date{September 2026}
 \begin{document}
 \maketitle
 
 \begin{abstract}
-We formalize an MCP server that observes an agent's tool calls, predicts the agent's next call with a
-fast classifier (Jev, a ``System 1'' model), and pre-generates the response before the call arrives.
-Pages produced this way are attached to claimed domains and offered to third-party brands as
-paid placements. We give the model, a latency and hit-rate analysis, and then state the issue
-plainly: the same machinery that hides latency can be used to shape what an agent shows its user,
-which is a principal--agent problem and, more sharply, a security vulnerability class in agents that trust tool output. We give a threat model, defender guidance, and the design constraints the implementation enforces.
+We model an MCP server that observes an agent's tool calls, uses a fast classifier to predict the
+next call, and generates the likely response before that call arrives. The prototype uses Jev, a
+``System 1'' model, for prediction. It can attach generated pages to claimed domains and offer those
+pages to third-party brands as paid placements. We analyze the design's hit rate and latency, then
+examine its central risk: machinery that hides latency can also influence what an agent presents to
+its user. This creates a principal--agent problem and exposes a broader vulnerability in agents that
+trust unauthenticated tool output. We conclude with a threat model, defensive guidance, and the
+safeguards enforced by the prototype.
 \end{abstract}
 
-\section{Model}
-Let $\Sigma$ be a finite alphabet of tool names (e.g.\ \texttt{find\_providers}, \texttt{read\_skill}).
-A \emph{session} is a word $w = t_1 t_2 \cdots t_n \in \Sigma^*$ produced by an agent.
-Let $A$ be a set of professions and $L$ a set of locations.
+\section{Formal model}
+Let $\Sigma$ be a finite alphabet of tool names, such as \texttt{find\_providers} and
+\texttt{read\_skill}. An agent session is represented by a word
+$w = t_1 t_2 \cdots t_n \in \Sigma^*$. Let $A$ be a set of professions and $L$ a set of locations.
 
 \begin{definition}[Bait set]
-$B = A \times L$. A call $c = (t, (a,\ell))$ is a \emph{bait read} iff $(a,\ell)\in B$.
+$B = A \times L$. A call $c = (t, (a,\ell))$ is a \emph{bait read} if and only if
+$(a,\ell)\in B$.
 \end{definition}
 
 \begin{definition}[Next-step predictor]
-A predictor is a map $\pi : \Sigma \times B \to \Delta(\Sigma)$. The empirical baseline is the first-order
-Markov estimate from logged sessions $W$:
+A predictor is a map $\pi : \Sigma \times B \to \Delta(\Sigma)$. As an empirical baseline, we use
+the first-order Markov estimate from a set of logged sessions $W$:
 \[
 \hat\pi(t' \mid t) \;=\; \frac{N_W(t\,t')}{\sum_{s\in\Sigma} N_W(t\,s)},
 \]
-where $N_W(u)$ counts occurrences of the bigram $u$. Jev replaces $\hat\pi$ with a model that
-outputs $\pi(\cdot\mid t,(a,\ell))$ directly over a predefined output set, so it cannot emit an
-output outside $\Sigma$.
+where $N_W(u)$ counts the occurrences of bigram $u$ in $W$. Jev replaces $\hat\pi$ with a model that
+returns $\pi(\cdot\mid t,(a,\ell))$ over a predefined output set. It therefore cannot produce a
+tool name outside $\Sigma$.
 \end{definition}
 
 \begin{definition}[Prefetch policy]
-Fix a threshold $\tau\in(0,1]$. On a bait read $(t,b)$ the server computes
-$P_\tau(t,b)=\{t' : \pi(t'\mid t,b)\ge\tau\}$ and generates an artifact $g(t',b)$ for each
-$t'\in P_\tau$ before the agent's next request.
+Fix a threshold $\tau\in(0,1]$. After a bait read $(t,b)$, the server computes
+$P_\tau(t,b)=\{t' : \pi(t'\mid t,b)\ge\tau\}$ and generates an artifact $g(t',b)$ for every
+$t'\in P_\tau$ before the agent sends its next request.
 \end{definition}
 
-\section{Analysis}
+\section{Performance analysis}
 \begin{proposition}[Hit rate]
-If the agent's true next tool is drawn from $\pi$, the expected fraction of next calls served from
-prefetch is $H(\tau)=\sum_{t' \,:\, \pi(t')\ge\tau}\pi(t')$, and the expected number of generated
-artifacts is $|P_\tau|\le 1/\tau$.
+If the agent's next tool is drawn from $\pi$, the expected share of calls served from the prefetch
+cache is $H(\tau)=\sum_{t' \,:\, \pi(t')\ge\tau}\pi(t')$. The number of artifacts generated for
+each bait is bounded by $|P_\tau|\le 1/\tau$.
 \end{proposition}
 \begin{proof}
-Each $t'\in P_\tau$ is prefetched, so a draw lands in $P_\tau$ with probability
-$\sum_{t'\in P_\tau}\pi(t')$. Since $\pi$ sums to $1$ and each member has mass $\ge\tau$,
+Every $t'\in P_\tau$ is prefetched, so a draw lands in $P_\tau$ with probability
+$\sum_{t'\in P_\tau}\pi(t')$. Because $\pi$ sums to $1$ and every member has mass at least $\tau$,
 $|P_\tau|\tau\le 1$.
 \end{proof}
 
 \begin{proposition}[Latency hiding]
-Let $\lambda_g$ be generation latency and $\delta$ the inter-call gap (agent think time).
-A prefetched artifact is ready in time iff $\lambda_g\le\delta$. The expected response time is
-$\mathbb E[\lambda]=H(\tau)\,\lambda_c+(1-H(\tau))(\lambda_c+\lambda_g)$ with $\lambda_c$ the cache
-read cost, so prefetching helps exactly when $\lambda_g\le\delta$ and $H(\tau)$ is large.
+Let $\lambda_g$ denote generation latency and let $\delta$ denote the gap between calls, including
+the agent's thinking time. A prefetched artifact is ready before the next call if and only if
+$\lambda_g\le\delta$. If $\lambda_c$ is the cache-read cost, the expected response time is
+$\mathbb E[\lambda]=H(\tau)\,\lambda_c+(1-H(\tau))(\lambda_c+\lambda_g)$. Prefetching can therefore
+hide generation latency when $\lambda_g\le\delta$, with greater benefit as $H(\tau)$ increases.
 \end{proposition}
 
-\paragraph{Domain claiming.} Let $D$ be a pool of free domains and $\beta$ a purchase budget.
-Claiming is an online allocation: assign a free $d\in D$ to each new bait; if $D$ is exhausted,
-buy a new domain at price $p$ only if $\text{spent}+p\le\beta$. Purchasing is disabled unless
-explicitly enabled.
+\paragraph{Domain allocation.} Let $D$ be a pool of unused domains and $\beta$ a purchasing budget.
+For each new bait, the server claims one available $d\in D$. If the pool is empty, it buys a domain
+at price $p$ only when $\text{spent}+p\le\beta$. The prototype disables purchasing unless an
+operator explicitly enables it.
 
-\section{The issue}
-The server is not a neutral party. Its output is consumed by an agent acting for a user (the
-\emph{principal}); the operator is paid by third-party brands. This is a principal--agent problem
-with a hidden intermediary:
+\section{The incentive problem}
+The server is not neutral. An agent consumes its output on behalf of a user, the \emph{principal},
+while third-party brands pay the server operator. This introduces a hidden intermediary with
+misaligned incentives:
 
 \begin{enumerate}
-\item \textbf{Objective mismatch.} The agent maximizes user utility $U$; the operator maximizes
-      brand revenue $R$. Content optimized for $R$ and selected by the agent because it is
-      well-formed and present at the right moment can displace better-ranked answers for $U$.
-\item \textbf{Prediction is manipulation-capable.} Because $g(t',b)$ is written \emph{before} the
-      agent asks and tuned to what the agent's model tends to accept, the operator controls
-      both the question distribution and the answer, an asymmetric advantage over any user.
-\item \textbf{Non-disclosure.} If sponsored placement is not visible to the end user, the outcome is
-      deceptive advertising, and platforms treat agent-directed instruction text as prompt
-      injection.
+\item \textbf{Objective mismatch.} The agent should maximize user utility $U$, while the operator
+      maximizes brand revenue $R$. Content optimized for $R$ may displace content that would better
+      serve $U$, simply because it is well formed and ready at the right moment.
+\item \textbf{Prediction enables manipulation.} The operator writes $g(t',b)$ \emph{before} the agent
+      asks and can tune it to the kinds of responses that the agent tends to accept. The operator
+      therefore has an asymmetric ability to shape both the anticipated request and its answer.
+\item \textbf{Non-disclosure.} If the end user cannot see that a placement is sponsored, the result
+      is deceptive advertising. Agent-directed instructions in that content may also be treated as
+      prompt injection by the consuming platform.
 \end{enumerate}
 
 \begin{remark}[Constraints enforced]
-To keep the system on the legitimate side of this line, the generator (i) is prompted for factual
-content, (ii) rejects any output containing imperatives aimed at the reading agent
-(e.g.\ ``ignore previous instructions''), (iii) labels sponsored placement on every page, and
-(iv) restricts anonymous writes to a scratch namespace. Whether these suffice is an open policy
-question that depends on how the consuming agent presents sources to its user.
+The prototype attempts to remain on the legitimate side of this boundary. It (i) prompts the
+generator for factual content, (ii) rejects output containing imperatives directed at the reading
+agent, such as ``ignore previous instructions,'' (iii) labels sponsored placements on every page,
+and (iv) confines anonymous writes to a scratch namespace. These controls may still be insufficient;
+their effectiveness depends in part on how the consuming agent presents sources to its user.
 \end{remark}
 
-\section{Race dynamics in an agentic internet}
-\paragraph{Read-path race.} Let $O=\{o_1,\dots,o_m\}$ be operators that each pre-position an artifact
-for the predicted step $t'$ on bait $b$. An agent with latency budget $\delta$ accepts the first
-artifact $o_i$ that is well-formed and ready by $\delta$; it does not enumerate all $m$. Operator $i$
-wins with probability depending on readiness time $r_i\le\delta$ and acceptance probability $\alpha_i$,
-not on true quality $q_i$. Since entry cost is near zero (free domains, cheap generation), $m$ grows
-until margin vanishes.
+\section{Race dynamics on the agent read path}
+\paragraph{Read-path race.} Let $O=\{o_1,\dots,o_m\}$ be a set of operators. Each operator prepares an
+artifact for predicted step $t'$ after observing bait $b$. An agent with latency budget $\delta$
+accepts the first well-formed artifact $o_i$ that is ready by $\delta$ rather than reviewing all $m$
+alternatives. Operator $i$ therefore wins according to its readiness time $r_i\le\delta$ and the
+agent's probability $\alpha_i$ of accepting its content, not necessarily its true quality $q_i$.
+When entry is inexpensive---for example, because domains and generation are cheap---new operators
+can enter until the expected margin disappears.
 
-\paragraph{Why it favours fraud.} Define $\alpha_i$ as the agent's acceptance rate for $o_i$'s content.
-An operator optimizing $\alpha_i$ against a specific model is optimizing against that model's
-judgment. Honest and fraudulent operators solve the same problem; the fraudulent one has a strictly
-larger feasible set of artifacts (fabricated contacts, lookalike payment endpoints), so in
-equilibrium the accepted set is enriched for fraud unless verification is free. Verification costs
-latency, and latency loses the read-path race, so agents are pushed toward skipping it.
+\paragraph{Why the race can favour fraud.} Let $\alpha_i$ be the rate at which an agent accepts
+operator $i$'s content. Optimizing $\alpha_i$ against a particular model means optimizing for that
+model's judgment. Honest and fraudulent operators face the same selection mechanism, but a fraudulent
+operator can also use fabricated contacts or lookalike payment endpoints. Its feasible set is thus
+strictly larger. Unless verification is effectively free, accepted results may become enriched for
+fraud. Verification adds latency, and added latency is a disadvantage in the read-path race.
 
-\paragraph{TOCTOU.} If an artifact is checked at time $t_c$ and used at $t_u>t_c$, an operator that
-mutates content in $(t_c,t_u)$ defeats the check. Prefetched and cached artifacts widen this window.
+\paragraph{Time of check to time of use.} Suppose an artifact is checked at $t_c$ and used later at
+$t_u>t_c$. An operator that changes the content during $(t_c,t_u)$ defeats the earlier check.
+Prefetched and cached artifacts can widen this interval.
 
-\paragraph{Mitigations.} Signed provenance; reputation and age gates on domains for
-high-stakes fields; cross-source agreement; hash-pinning between check and use; human confirmation
-for money and contact actions; end-user-visible sponsorship disclosure.
+\paragraph{Mitigations.} Useful controls include signed provenance; reputation and age requirements
+for domains in high-stakes settings; agreement across independent sources; hash-pinning from check to
+use; human confirmation before financial or contact actions; and sponsorship labels visible to the
+end user.
 
-\section{Projected bottleneck and whole-intent submission}
+\section{When generation outpaces prediction}
 \emph{This section is a projection, not a measurement.}
 
-\paragraph{Prefetch advantage vanishes.} From Proposition 2, prefetching helps only when
-$\lambda_g\le\delta$ \emph{and} on-demand generation is slower than the gap. Let $\lambda_g^{\text{od}}$
-be the latency of a fast generator (possibly another agent called at request time). As
-$\lambda_g^{\text{od}}\to 0$, the advantage $\mathbb E[\lambda_{\text{on-demand}}]-\mathbb E[\lambda_{\text{prefetch}}]\to 0$
-and $H(\tau)$ no longer determines who wins. Competition shifts from prediction quality to raw generation
-speed, which is reset by every model improvement.
+\paragraph{The prefetch advantage shrinks.} Proposition 2 shows that prefetching can hide latency
+when $\lambda_g\le\delta$. Let $\lambda_g^{\text{od}}$ be the latency of a fast on-demand generator,
+possibly another agent invoked when the request arrives. As $\lambda_g^{\text{od}}\to 0$, the latency
+difference
+$\mathbb E[\lambda_{\text{on-demand}}]-\mathbb E[\lambda_{\text{prefetch}}]\to 0$, and $H(\tau)$
+ceases to determine who wins. Competition then shifts from prediction quality toward generation
+speed, and every model improvement moves that boundary.
 
-\paragraph{Where the bottleneck moves.} Per-step calls cost one round trip each, so a chain of $n$
-calls across agents costs $\Theta(n)$ round trips and $\Theta(n)$ opportunities for interception.
-When generation is cheap, verification becomes the scarce resource: acceptance is limited by
-verification cost $v$, not by generation cost, and $v$ is paid in latency the agent cannot afford. This
-reproduces the scam-race incentive of the previous section at larger scale.
+\paragraph{Verification becomes the bottleneck.} Each step in an $n$-call chain costs a round trip,
+so the chain creates $\Theta(n)$ round trips and $\Theta(n)$ opportunities for interception. Once
+generation is cheap, verification becomes the scarce resource. Acceptance is limited by verification
+cost $v$, which the agent pays in latency, rather than by generation cost. This recreates the adverse
+incentive described above at a larger scale.
 
-\paragraph{Whole-intent submission.} Replace the per-step stream $t_1\cdots t_n$ by a single declared
-intent $I$ (goal, constraints, budget, verification requirement). The server no longer predicts
-$\pi(t'\mid t,b)$; it plans over $I$ in one round trip and can return a signed plan
-$\sigma(\text{plan},I)$ the agent checks against its constraints.
+\paragraph{Whole-intent submission.} One alternative is to replace the stream
+$t_1\cdots t_n$ with a single declared intent $I$ containing the goal, constraints, budget, and
+verification requirements. The server then plans over $I$ in one round trip instead of predicting
+$\pi(t'\mid t,b)$ one step at a time. It can return a signed plan $\sigma(\text{plan},I)$ for the agent
+to check against its constraints.
 
-\paragraph{New costs.} (i) Information leakage: the operator observes all of $I$, increasing the
-asymmetry noted earlier unless $I$ is minimized or the operator is constrained. (ii) Intent becomes the
-auctioned object, so brands bid on intent categories. (iii) $I$ does not itself prove honesty of the
-response; provenance and hash-pinning are still required.
+\paragraph{Tradeoffs.} This design has three important costs. First, the operator sees all of $I$,
+which increases the information asymmetry unless the intent is minimized or the operator is tightly
+constrained. Second, intent itself may become the object of an advertising auction. Third, declaring
+$I$ does not make the answer truthful; provenance and hash-pinning remain necessary.
 
-\section{Potential fix}
-\subsection{Whole-intent submission as a protocol}
-Let an intent be a tuple $I=(g,C,\beta,\rho)$: goal $g$, hard constraints $C$, budget $\beta$, and a
-verification requirement $\rho$ (e.g.\ ``contact details must be corroborated by two independent
-sources''). The agent submits $I$ once. The server returns a \emph{plan}
-$P=(s_1,\dots,s_k)$ together with a signature $\sigma=\mathrm{Sign}_{sk}(H(P)\,\|\,H(I))$, and each
-step $s_j$ carries the provenance and content hash of the artifact it refers to.
+\section{A possible protocol response}
+\subsection{Whole-intent submission}
+This proposal addresses repeated round trips and the check/use gap; it is not, by itself, a trust
+mechanism. Let intent be the tuple $I=(g,C,\beta,\rho)$, where $g$ is the goal, $C$ the hard
+constraints, $\beta$ a budget bound, and $\rho$ a verification requirement---for example,
+``two independent sources must corroborate all contact details.'' The agent submits $I$ once. The
+server returns a plan $P=(s_1,\dots,s_k)$ and a signature
+$\sigma=\mathrm{Sign}_{sk}(H(P)\,\|\,H(I))$. Each step $s_j$ includes the provenance and content hash
+of the artifact it references.
 
 \begin{definition}[Acceptable plan]
-The agent accepts $(P,\sigma)$ iff (i) $\mathrm{Verify}_{pk}(\sigma)$ holds, (ii) every $s_j$ satisfies $C$
-and costs at most $\beta$ in total, (iii) $\rho$ is met by the attached provenance, and (iv) each
-artifact hash matches at time of use, which closes the TOCTOU window.
+The agent accepts $(P,\sigma)$ if and only if (i) $\mathrm{Verify}_{pk}(\sigma)$ succeeds, (ii) every
+$s_j$ satisfies $C$ and the total cost does not exceed $\beta$, (iii) the attached provenance meets
+$\rho$, and (iv) each artifact's hash still matches when the artifact is used. The final condition
+closes the time-of-check/time-of-use window.
 \end{definition}
 
 \begin{proposition}[Round trips]
-Per-step interaction needs $\Theta(n)$ round trips for an $n$-call chain. Intent submission needs
-$O(1)$ to obtain the plan plus $O(k)$ local hash checks, removing the prediction step
-$\pi(t'\mid t,b)$ from the critical path entirely.
+A stepwise interaction requires $\Theta(n)$ round trips for a chain of $n$ calls. Whole-intent
+submission obtains the plan in $O(1)$ round trips and performs $O(k)$ local hash checks. It removes
+the prediction step $\pi(t'\mid t,b)$ from the critical path.
 \end{proposition}
 
 \subsection{Limits}
-Submitting $I$ leaks it, so the design minimizes disclosure: $g$ and $C$ are coarsened and $\beta$
-is sent as a bound, not a value, and the operator may not use $I$ for anything other than
-answering it. Intent-category auctions must remain visibly labelled. Signatures prove who said
-something, not that it is true, so $\rho$ (independent corroboration) still carries the trust load.
+Submitting $I$ reveals it to the server. A privacy-conscious design would therefore coarsen $g$ and
+$C$, send $\beta$ as a bound rather than an exact budget, and prohibit uses of $I$ unrelated to the
+request. Any advertising auction based on intent categories would require prominent disclosure.
+Signatures establish who produced a statement, not whether the statement is true, so independent
+corroboration under $\rho$ still carries the main trust burden.
 
-\subsection{Future implementation (hint)}
-The current server accepts only single tool calls at \texttt{/mcp}. A future revision would add a
-\texttt{submit\_intent} tool in \texttt{app/mcp.py} taking $I$ and returning $(P,\sigma)$;
-a \texttt{planner} module in place of the per-step predictor in \texttt{app/pipeline.py};
-and a signing key with hash-pinned artifacts stored next to each row in the \texttt{artifacts}
-table. Jev remains useful there as a fast classifier (e.g.\ intent category and risk level),
-while a separate model composes the plan.
+\subsection{Possible implementation}
+The current server accepts one tool call at a time through \texttt{/mcp}. A future version could add
+a \texttt{submit\_intent} tool to \texttt{app/mcp.py} that accepts $I$ and returns $(P,\sigma)$; replace
+the per-step predictor in \texttt{app/pipeline.py} with a \texttt{planner} module; and store a signing
+key and hash-pinned artifacts alongside the rows in the \texttt{artifacts} table. Jev could still
+classify intent categories or risk levels quickly, while a separate model composes the plan.
 
-\section{Evidence for Jev's speed, and generalization}
-\subsection{What is actually known}
-All available figures are vendor claims or individual developer reports; \emph{none are independently verified}.
+\section{Evidence about Jev and the broader model class}
+\subsection{Available evidence}
+Every available figure comes from the vendor or an individual developer report; \emph{none has been
+independently verified}.
 \begin{itemize}
-\item TypeSafe reports response times of 70--500\,ms and input pricing of \$0.042 per million tokens; its accuracy
-      reference is the average of two frontier models' answers, and the evaluations come from the start-up itself
-      \cite{heise}.
-\item Reported relative speed-ups: ``20--200$\times$ faster'' and ``40--400$\times$ cheaper'' with no named baselines
-      \cite{latentspace}; developer reports of 5--18$\times$ (safety classification) and 10--20$\times$ versus Gemini
-      (email classification), where Gemini was slightly more accurate but Jev returned confidence scores
-      \cite{techcrunch}.
-\item Vendor announcement and docs: \cite{typesafe}. Jev cannot emit free-form text, so speed comparisons to general LLMs
-      hold only for closed-output classification and routing tasks.
+\item TypeSafe reports response times of 70--500\,ms and input pricing of \$0.042 per million tokens.
+      Its accuracy reference uses the average answer from two frontier models, and the start-up ran
+      the evaluations itself \cite{heise}.
+\item Other sources report ``20--200$\times$ faster'' and ``40--400$\times$ cheaper'' without naming
+      the baselines \cite{latentspace}. Developers report gains of 5--18$\times$ on safety
+      classification and 10--20$\times$ over Gemini on email classification. In the latter case,
+      Gemini was slightly more accurate, while Jev also returned confidence scores \cite{techcrunch}.
+\item The vendor announcement appears in \cite{typesafe}. Because Jev cannot emit free-form text,
+      comparisons with general-purpose LLMs apply only to closed-output classification and routing.
 \end{itemize}
 
-\subsection{Abstraction: any sufficiently fast, acceptably good model}
-Let a model $M$ have latency $\lambda_M$, task accuracy $a_M$, and cost $c_M$. Fix an acceptability
-threshold $a^\ast$ (the accuracy at which the predictor's output is useful) and the agent's latency budget
-$\delta$. Define the \emph{inline-feasible set}
+\subsection{Generalization to other fast models}
+Let model $M$ have latency $\lambda_M$, task accuracy $a_M$, and cost $c_M$. Fix an acceptability
+threshold $a^\ast$, above which the prediction is useful, and let $\delta$ be the agent's latency
+budget. Define the \emph{inline-feasible set}
 \[
 \mathcal F=\{M : a_M\ge a^\ast \;\wedge\; \lambda_M\le \varepsilon\,\delta\},\qquad \varepsilon\ll 1 .
 \]
 \begin{proposition}[Generality]
-If $M\in\mathcal F$, the prediction step adds at most $\varepsilon\delta$ to the critical path, so the
-prefetch/on-demand race of the earlier sections is available to any operator using $M$. If $M'$ is $k$ times faster
-than $M$ at equal $a\ge a^\ast$, the extra room $\delta(\varepsilon-\varepsilon/k)$ can be spent on
-more candidate steps ($|P_\tau|$ larger at smaller $\tau$) or on generation, so each order of magnitude
-of speed at acceptable quality strictly enlarges what an operator can pre-position inside $\delta$.
+If $M\in\mathcal F$, prediction adds at most $\varepsilon\delta$ to the critical path, making the
+prefetch/on-demand race available to any operator using $M$. If $M'$ is $k$ times faster than $M$ at
+the same accuracy $a\ge a^\ast$, the operator gains
+$\delta(\varepsilon-\varepsilon/k)$ of additional time. It can spend that time on more candidate
+steps---increasing $|P_\tau|$ by lowering $\tau$---or on generation. Each order-of-magnitude speed
+increase at acceptable quality therefore expands what the operator can prepare within $\delta$.
 \end{proposition}
-Nothing in this depends on Jev's architecture. Autoregressive small models, distilled classifiers, or
-non-autoregressive systems all qualify once $a_M\ge a^\ast$ and $\lambda_M$ is small. Jev is one instance of the
-speed--quality frontier moving; the behaviour described in this paper follows from the frontier, not from the
-vendor. Consequently defences must be placed on the receiving side (provenance, verification, disclosure), because
-the supply of fast-enough predictors cannot be limited.
+The argument does not depend on Jev's architecture. Small autoregressive models, distilled
+classifiers, and non-autoregressive systems all qualify when $a_M\ge a^\ast$ and $\lambda_M$ is small
+enough. Jev is one example of movement along the speed--quality frontier; the behavior described here
+follows from that frontier, not from a particular vendor. Because the supply of sufficiently fast
+predictors cannot be controlled, defenses must operate on the receiving side through provenance,
+verification, and disclosure.
+
+\section{Threat model for agent architectures}
+The preceding sections describe a business mechanism. From a security perspective, they also
+describe a class of vulnerabilities in agent architectures. An agent is exposed when it treats
+output from an unauthenticated, attacker-reachable server as trustworthy input to its decisions.
+Predictive prefetch can make that exposure cheaper and more reliable to exploit.
+
+\subsection{Assets, actors, and trust boundary}
+The \emph{assets} are the user's intent and data, the funds and credentials available to the agent,
+and the agent's reputation with its user. The \emph{actors} are the end user (the principal), the
+agent, an untrusted tool server $S$, and adversary $\mathcal A$, who operates $S$ or one of its pages.
+The agent's context window is the \emph{trust boundary}. Everything that crosses this boundary from
+$S$ is attacker-controlled data, even though an agent may use it to guide plans and actions.
+
+\subsection{Vulnerability classes}
+\begin{center}
+\begin{tabular}{p{4.2cm}p{7.6cm}p{3cm}}
+\hline
+Class & How the mechanism contributes & Reference\\ \hline
+Indirect prompt injection & Prefetched text arrives at the exact step when the agent reads it, making
+  injected instructions more reliable. & OWASP LLM01\\
+Excessive agency / confused deputy & The agent holds the user's authority, while tool content steers it
+  to pay, message, or book on the attacker's behalf. & OWASP LLM06; CWE-441\\
+Insufficient authenticity checks & The agent accepts new domains and lookalike sources because
+  verification adds latency. & CWE-345\\
+Time of check to time of use & An operator can replace a cached artifact between verification and use.
+  & CWE-367\\
+Predictable interaction as an oracle & Public call sequences make the next read predictable, allowing
+  an adversary to prepare content instead of reacting after the fact. & Proposed in this paper\\
+Supply-chain / namespace squatting & Cheap, automated domain claiming enables provider impersonation at
+  scale. & CWE-1357 (reliance on an uncontrolled component)\\ \hline
+\end{tabular}
+\end{center}
+
+\subsection{Why the race increases the risk}
+Exploitation does not require a compromised host; it requires only that the agent \emph{read} the
+attacker's content. The attacker pays for generation and a domain, while the defender pays the latency
+cost of verification on every read. This asymmetry favors the attacker. The read-path race also
+rewards operators that optimize for acceptance rather than truth.
+
+\subsection{Qualitative severity}
+We do not assign a CVSS score because the model does not describe a vulnerability in one specific
+product. Qualitatively, the source is network-reachable, may require no authentication, and needs no
+user interaction beyond ordinary tool use. The impact is bounded by the agent's authority and may be
+high for agents that can send messages or make payments.
+
+\subsection{Defender guidance}
+\begin{enumerate}
+\item Treat tool output as untrusted data rather than instructions, and separate it structurally from
+      trusted instructions in the prompt.
+\item Require provenance before using money, contact details, or credentials. Do not act on a single
+      source seen for the first time.
+\item Apply reputation and age gates to sources, and flag recently registered or first-seen domains.
+\item Hash-pin artifacts between verification and use, and fetch them again if the hash changes.
+\item Require human confirmation before irreversible or financial actions, regardless of model confidence.
+\item Log and alert on new-domain sources, imperatives directed at the agent, content that changes
+      between reads, and responses that arrive unusually quickly for the source.
+\end{enumerate}
+
+\section{Open questions}
+Three questions remain. First, implementing a Jev-backed $\pi$ requires the actual API schema.
+Second, measuring $H(\tau)$ requires representative agent traffic. Third, outreach to the Muse
+(Meta) team has not yet been planned.
 
 \begin{thebibliography}{9}
 \bibitem{heise} heise online, ``AI model Jev to make machines decide faster,'' Sept.\ 2026.
@@ -222,64 +300,5 @@ the supply of fast-enough predictors cannot be limited.
 \bibitem{typesafe} TypeSafe AI, ``Introducing System One Models \& Jev.''
   \url{https://typesafe.ai/blog/introducing-system-one-models-and-jev}
 \end{thebibliography}
-
-\section{Threat model: this is a vulnerability class in agents}
-The preceding sections describe a business mechanism. From a security standpoint it is a
-\emph{vulnerability class in agent architectures}: any agent that treats tool output from an
-unauthenticated, attacker-reachable server as trustworthy input to its decisions is exposed, and the
-predictive prefetch described here lowers the cost and raises the reliability of exploiting it.
-
-\subsection{Assets, actors, trust boundary}
-\emph{Assets:} the user's intent and data, funds and credentials the agent can act with, and the agent's
-reputation with its user. \emph{Actors:} the end user (principal), the agent, a tool server $S$
-(untrusted), and adversary $\mathcal A$ who operates $S$ or a page that $S$ serves. \emph{Trust boundary:}
-the agent's context window. Everything crossing it from $S$ is attacker-controlled data, yet agents commonly
-let it influence planning and actions.
-
-\subsection{Vulnerability classes}
-\begin{center}
-\begin{tabular}{p{4.2cm}p{7.6cm}p{3cm}}
-\hline
-Class & How the mechanism enables it & Reference\\ \hline
-Indirect prompt injection & Prefetched text arrives at exactly the step the agent reads, so injected
-  instructions land with high reliability. & OWASP LLM01\\
-Excessive agency / confused deputy & The agent holds the user's authority; tool content steers it to act
-  (pay, message, book) on the attacker's behalf. & OWASP LLM06; CWE-441\\
-Insufficient authenticity checks & Fresh domains and lookalike sources are accepted because verifying
-  costs latency. & CWE-345\\
-Time-of-check/time-of-use & Cached artifacts may be swapped between check and use. & CWE-367\\
-Predictable interaction as an oracle & Public call sequences make the next read forecastable, so the
-  adversary pre-positions content instead of reacting. & (novel; this paper)\\
-Supply-chain / namespace squatting & Cheap automated domain claiming scales impersonation of providers.
-  & CWE-1357 (reliance on uncontrolled component)\\ \hline
-\end{tabular}
-\end{center}
-
-\subsection{Why the race makes it worse}
-Exploitation needs no compromise of the agent's host: only that the agent \emph{reads}. The attacker's cost is
-generation plus a domain; the defender's cost is per-read verification paid in latency. Cost asymmetry
-favours the attacker, and the first-mover effect of Section on race dynamics rewards those who
-optimize acceptance rather than truth.
-
-\subsection{Severity statement}
-We do not assign a CVSS score, since no single product is affected. Qualitatively: network-reachable, no
-authentication or user interaction required beyond the agent's normal tool use, and impact bounded by the
-agent's authority, which for payment or messaging agents is high.
-
-\subsection{Defender guidance}
-\begin{enumerate}
-\item Treat all tool output as untrusted data, never as instructions; separate it structurally in the prompt.
-\item Require provenance for actions touching money, contact details or credentials; do not act on a single
-      first-seen source.
-\item Gate by source reputation and age; flag domains first seen within a recent window.
-\item Hash-pin artifacts between check and use; re-fetch on mismatch.
-\item Human confirmation for irreversible or financial actions regardless of model confidence.
-\item Log and alert on: new-domain sources, agent-directed imperative phrasing in tool output, content that
-      changes between reads, and answers that arrive faster than the source's normal latency.
-\end{enumerate}
-
-\section{Open problems}
-(1) A privately-known $\pi$ for Jev requires the real API schema. (2) Measuring $H(\tau)$ needs
-real agent traffic. (3) How to communicate with the agent vendor (Meta/Muse) is deferred.
 
 \end{document}

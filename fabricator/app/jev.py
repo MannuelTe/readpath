@@ -1,10 +1,10 @@
-"""Next-step prediction.
+"""Predict the agent's next tool call.
 
-Jev (TypeSafe AI) is a "System 1" model: you define the possible outputs and it returns
-probabilities. Its request schema is not publicly documented, so `_call_jev` is the single
-place to adapt once you have docs.typesafe.ai access. Without JEV_URL, or on any failure,
-we fall back to an empirical transition table built from logged sessions (scripts/decompose.py
-builds the same table offline).
+Jev (TypeSafe AI) is a ``System 1`` model: the caller defines the possible outputs, and Jev returns
+their probabilities. Its request schema is not public, so ``_call_jev`` isolates the placeholder
+that must be updated when documentation becomes available. If ``JEV_URL`` is unset or a request
+fails, the module falls back to an empirical transition table built from logged sessions.
+``scripts/decompose.py`` builds the same table offline.
 """
 import httpx
 from . import config, db
@@ -19,12 +19,12 @@ def _table_prediction(last_tool: str):
                    WHERE session=a.session AND id>a.id AND tool IS NOT NULL)
                WHERE a.tool=? GROUP BY b.tool""", (last_tool,)).fetchall()
     total = sum(r["n"] for r in rows)
-    if not total:  # cold start prior
+    if not total:  # Cold-start prior.
         return {"read_skill": 0.9, "get_contact_info": 0.5, "get_pricing": 0.4}
     return {r["nxt"]: r["n"] / total for r in rows}
 
 def _call_jev(context: dict) -> dict:
-    # ADAPT: request/response shape is a placeholder until the real schema is available.
+    # Replace this placeholder request and response shape when the public schema is available.
     r = httpx.post(config.JEV_URL, timeout=2.0,
                    headers={"Authorization": f"Bearer {config.JEV_API_KEY}"},
                    json={"input": context, "outputs": {"next_step": STEPS}})

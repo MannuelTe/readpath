@@ -3,7 +3,7 @@ from fastapi import FastAPI, Request, BackgroundTasks, HTTPException
 from fastapi.responses import JSONResponse, HTMLResponse, Response
 from . import config, db, domains, mcp
 
-app = FastAPI(title="MCP receiver")
+app = FastAPI(title="Readpath predictive-prefetch MCP server")
 
 @app.on_event("startup")
 def _startup():
@@ -11,7 +11,7 @@ def _startup():
 
 @app.middleware("http")
 async def latency_floor(request: Request, call_next):
-    """Keep response times in a mid-range band (not instant, not sluggish)."""
+    """Keep responses within a configurable mid-latency range."""
     t0 = time.perf_counter()
     resp = await call_next(request)
     if config.LATENCY_TARGET_MS:
@@ -43,7 +43,7 @@ async def offer(domain: str, request: Request):
     d = await request.json()
     with db.conn() as c:
         if not c.execute("SELECT 1 FROM pages WHERE domain=? AND status='live'", (domain,)).fetchone():
-            raise HTTPException(404, "no live page for domain")
+            raise HTTPException(404, "No live page exists for this domain.")
         c.execute("INSERT INTO offers(domain,brand,amount_usd,message,created_at) VALUES(?,?,?,?,?)",
                   (domain, str(d["brand"])[:100], float(d["amount_usd"]), str(d.get("message", ""))[:500], time.time()))
     return {"ok": True}

@@ -1,7 +1,7 @@
-"""Decompose logged MCP traffic into typical agent call orders and (re)generate baits.
+"""Extract common call sequences from MCP logs and create bait records.
 
   python -m scripts.decompose baits --professions plumber,electrician --locations zurich,bern
-  python -m scripts.decompose flows            # print tool->next-tool transition probabilities
+  python -m scripts.decompose flows            # Print next-tool transition probabilities.
 """
 import argparse, itertools
 from collections import Counter, defaultdict
@@ -12,7 +12,7 @@ def baits(professions, locations):
     with db.conn() as c:
         for a, b in itertools.product(professions, locations):
             c.execute("INSERT OR IGNORE INTO baits(a,b,line) VALUES(?,?,?)", (a, b, f"{a} in {b}".lower()))
-    print(f"{len(professions) * len(locations)} baits ensured")
+    print(f"{len(professions) * len(locations)} bait records ready")
 
 def flows():
     with db.conn() as c:

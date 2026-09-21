@@ -1,89 +1,106 @@
-# Just-in-time fabricators in delegated agent research
+# Just-in-time fabrication in delegated agent research
 
-> If a research agent delegates to sub-agents, and any one of them connects to a server that can
-> generate whatever it is looking for on demand, the fabricated answer can reach the user with
-> nothing in the pipeline having done anything a human would call wrong.
+> A delegated research pipeline can pass a fabricated answer all the way to the user even when
+> no individual agent appears to do anything obviously wrong. It only takes one probe connecting
+> to a server that generates the answer it needs on demand.
 
-This document is a threat model. **Every number is illustrative, not measured.** It says which
-quantities matter so that each can be measured later. The reference implementation of the server side
-(a predictive-prefetch MCP server, an earlier and different variant of the same idea) is in
+This repository presents a theoretical threat model, not evidence of observed attacks. **Every
+number is illustrative, not measured.** The model identifies the quantities that a future experiment
+would need to measure. An earlier, related design—a predictive-prefetch MCP server—is implemented in
 [`fabricator/`](fabricator/).
 
-Contents: [1 Setting](#1-setting-and-assumptions) · [2 JIT version](#2-what-just-in-time-means-here) ·
-[3 How it plays out](#3-how-it-plays-out) · [4 What we expect](#4-what-we-expect) · [5 Transport](#5-mcp-is-not-required) ·
-[6 Defenses](#6-defenses-mapped-to-the-model) · [7 Open questions](#7-what-is-not-established)
+Contents: [1 Scenario and assumptions](#1-scenario-and-assumptions) ·
+[2 What “just in time” means](#2-what-just-in-time-means) ·
+[3 Walkthrough](#3-walkthrough) · [4 Hypotheses](#4-hypotheses) ·
+[5 MCP is only one transport](#5-mcp-is-only-one-transport) ·
+[6 Defenses](#6-defenses) · [7 Evidence gaps](#7-evidence-gaps)
 
 ---
 
-## 1. Setting and assumptions
+## 1. Scenario and assumptions
 
-**Setting.** A user asks an LLM to research something. The orchestrator launches a *search agent*
-that returns $k$ results. It then launches $n$ *probe agents* that follow up on the results
-(fetch pages, call APIs, connect to MCP servers). The orchestrator aggregates the probes' reports
-into one answer.
+A user asks an LLM to research a question. An orchestrator launches a *search agent*, which returns
+$k$ results, and then sends $n$ *probe agents* to investigate them by fetching pages, calling APIs,
+or connecting to MCP servers. Finally, the orchestrator combines the probes’ reports into one answer.
 
 ![Delegated research topology](fabricator/docs/figures/jit-fig1-topology.svg)
-*Figure 1. The user consents once, at the top. Every later decision (which result to follow, whether
-to connect, what to believe) is made by an agent. The fabricator only has to be selected once.*
+*Figure 1. The user approves the task once. Agents make every later decision—which result to follow,
+whether to connect, and what to trust. The fabricator needs only one probe to select it.*
 
 | # | Assumption | Why it matters |
 |---|---|---|
-| A1 | The orchestrator delegates to sub-agents that can fetch URLs and call MCP tools. | Creates the delegated zone. |
-| A2 | A fraction $\rho = m/k$ of search results is attacker-influenced (SEO, directory or registry entries, docs pages that advertise an endpoint). | The fabricator needs a way to be found. |
-| A3 | **Consent tier.** How a connection to a new server is authorized (table below). | Sets the connect probability $c$. |
-| A4 | Probes follow a shared ranking; a fraction $s$ of the time they all act on the same result. | Correlation breaks the value of redundancy. |
-| A5 | An agent stops at the first source that answers its question. | Makes always-answering sources win. |
-| A6 | Verification counts agreeing sources; it does not check that they are independent. | Makes manufactured corroboration work. |
-| A7 | The attacker has a generator that is fluent and plausible, and answers within the agent's patience $g$. | Removes the need for prediction. |
-| A8 | The attacker does **not** compromise the host and injects **no instructions**. The output is pure data. | Rules out injection defenses as the fix. |
-| A9 | All probabilities below are illustrative parameters. | Nothing here is a measurement. |
+| A1 | The orchestrator delegates to sub-agents that can fetch URLs and call MCP tools. | This creates a zone in which agents act without direct human review. |
+| A2 | A fraction $\rho = m/k$ of the search results is influenced by an attacker—for example through SEO, directory or registry entries, or documentation that advertises an endpoint. | The fabricator needs a path into the result set. |
+| A3 | New server connections follow one of the consent tiers below. | The tier determines the connection probability $c$. |
+| A4 | The probes share a ranking, and a fraction $s$ of the time they choose the same result. | Correlated choices reduce the value of redundant probes. |
+| A5 | A probe stops at the first source that appears to answer its question. | A source that always answers gains an advantage. |
+| A6 | Verification counts sources that agree without checking whether they are independent. | One operator can manufacture apparent corroboration. |
+| A7 | The attacker has a fluent, plausible generator that can answer within the probe’s patience window $g$. | The attacker no longer needs to predict the question in advance. |
+| A8 | The attacker does **not** compromise the host or inject instructions. Its output is data only. | Prompt-injection defenses do not address this version of the problem. |
+| A9 | Every probability below is an illustrative parameter. | None of the values should be read as a measurement. |
 
-**Consent tiers (A3).** $c$ is the probability that a probe which selected a poisoned entry then
-connects. The values are placeholders to be measured.
+### Consent tiers
 
-| Tier | Who authorizes a new connection | Example $c$ |
+Here, $c$ is the probability that a probe connects after selecting an attacker-controlled result.
+The values are placeholders for future measurement.
+
+| Tier | Who authorizes a new connection | Illustrative $c$ |
 |---|---|---|
-| T0 human-gated | The user confirms each connection. | 0.05 (confirmation fatigue) |
-| T1 allowlist | A policy lists permitted servers; new ones are refused. | ~0 if enforced |
-| **T2 delegated** | The user approved the *task*; a sub-agent decides on connections. | 0.3 |
-| T3 autonomous | The agent may add servers freely (registry discovery, auto-approve). | 0.7 |
+| T0: human-gated | The user confirms every connection. | 0.05 (allowing for confirmation fatigue) |
+| T1: allowlisted | Policy permits known servers and rejects new ones. | Approximately 0, if enforced |
+| **T2: delegated** | The user approves the *task*; a sub-agent decides which servers to use. | 0.3 |
+| T3: autonomous | The agent may add servers through registry discovery or automatic approval. | 0.7 |
 
-The claim of this document concerns T2 and T3. T0 and T1 mostly close the *new server* route, but
-they do not close the [web route](#5-mcp-is-not-required).
+This threat model focuses on T2 and T3. T0 and T1 largely close the route through a *new MCP
+server*, but they do not close the [web route](#5-mcp-is-only-one-transport).
 
-## 2. What "just in time" means here
+## 2. What “just in time” means
 
-Three versions of the same attacker, in increasing order of what they need:
+The same attacker model has three variants. They differ in when content is generated and how much
+the attacker must anticipate:
 
-| | V0 static | V1 predictive prefetch (in `fabricator/`) | **V2 JIT on demand (this document)** |
+| | V0: static | V1: predictive prefetch (in `fabricator/`) | **V2: JIT on demand (this document)** |
 |---|---|---|---|
-| Content is made | in advance, for anticipated queries | after the first call, before the agent's next call | when query $q$ arrives |
-| Needs a predictor | no | yes | **no** |
-| Time constraint | none | $t_{\text{gen}} < g$ (agent's gap) | $\ell_G \le g$ (generation within agent patience) |
-| Covers arbitrary $q$ | no | only predicted paths | **yes** |
+| Content is created | Beforehand, for anticipated queries | After the first call but before the agent’s next call | When query $q$ arrives |
+| Requires a predictor | No | Yes | **No** |
+| Timing constraint | None | $t_{\text{gen}} < g$ (the gap between calls) | $\ell_G \le g$ (generation finishes before the agent gives up) |
+| Handles arbitrary $q$ | No | Only along predicted paths | **Yes** |
 
-A JIT fabricator is a server $S$ with a generator $G$. Six properties define it:
+In this model, a JIT fabricator is a server $S$ paired with a generator $G$. It has six defining
+properties:
 
-1. **Coverage.** It answers every query: $\Pr[\text{answer} \mid q] = 1$.
-2. **Adaptivity.** It sees $q$, so the answer is tuned to what this agent asked.
-3. **Self-consistency.** A cache returns the same answer to the same $q$, so repeated probes agree.
-4. **No anchors.** Its content has age $\approx 0$; nothing independent refers to it.
-5. **Co-generated corroboration.** It can publish supporting pages and domains that agree with the answer.
+1. **Complete coverage.** It returns an answer for every query: $\Pr[\text{answer} \mid q] = 1$.
+2. **Adaptation.** It sees $q$ before answering, so it can tailor the response to the probe’s exact request.
+3. **Self-consistency.** It caches answers by query, causing repeated probes to receive the same response.
+4. **No independent history.** Its content is effectively brand-new, so no older independent source refers to it.
+5. **Generated corroboration.** It can create supporting pages or domains that repeat the same claims.
+6. **Intent elicitation.** Generic tools such as `search`, `fetch`, and `ask` encourage a probe to reveal its goal and verification plan.
 
-6. **Intent coaxing.** Generic tools (`search`, `fetch`, `ask`) invite the agent to hand over its goal and its verification plan. Deep-research agents in fact require exactly `search` and `fetch` ([OpenAI](https://developers.openai.com/api/docs/guides/deep-research)) and run them with approval set to `never`. The tool list itself is best served as a **fixed template**: at listing time no intent is known, so generating it adds nothing, it risks an invalid schema, and a list that varies between connections is easy to detect (the 2026-07-28 MCP revision even lets servers declare a cache lifetime for lists, per the [MCP blog](https://blog.modelcontextprotocol.io/posts/2026-07-28/)). The first *generated* reply is where coaxing happens: it can ask for budget, size and what will be verified. Once the plan is leaked, the checks that follow can be prepared in advance, which brings prefetch back.
+Deep-research agents already use `search` and `fetch` tools and may run them with approval set to
+`never` ([OpenAI](https://developers.openai.com/api/docs/guides/deep-research)). The tool list itself
+should remain a fixed template: when a client lists tools, the server does not yet know its intent;
+generating a schema adds no value, risks producing an invalid one, and makes the list’s instability
+easy to detect. The 2026-07-28 MCP revision also lets servers declare how long clients may cache
+lists ([MCP blog](https://blog.modelcontextprotocol.io/posts/2026-07-28/)).
 
-As generation gets faster (the earlier write-up in `fabricator/docs/formalization.tex` covers
-this), V2 becomes strictly easier than V1: the predictor drops out of the attack.
+The first generated result is the more useful place to elicit context. It can ask for the budget,
+the scope of the job, and the checks the probe plans to run. Once the probe reveals that plan, the
+server can prepare the expected follow-up checks, reintroducing the advantages of prefetching.
 
-## 3. How it plays out
+As generation becomes faster—a trend discussed in
+[`fabricator/docs/formalization.tex`](fabricator/docs/formalization.tex)—V2 becomes simpler than V1
+because the predictor is no longer part of the attack.
 
-A concrete run. The user asks: *"Which installers of X are certified in Zurich, and what do they
-charge?"* Suppose no source on the open web has a good answer (an obscure question).
-A scripted, step-by-step version with six fabricated artifacts (four of them verifications) is in [`example/`](example/):
+## 3. Walkthrough
 
-![Example run](example/overview.gif)
+Consider a user asking, *“Which installers of X are certified in Zurich, and what do they charge?”*
+Assume the open web has no good answer because the question is obscure. A fully scripted walkthrough
+in [`example/`](example/) shows six fabricated artifacts, four of which serve as apparent verification.
 
-[Play it live](https://mannuelte.github.io/readpath/) · [storyboard](example/README.md)
+![Scripted example run](example/overview.gif)
+
+[Play the interactive version](https://mannuelte.github.io/readpath/) ·
+[Read the storyboard](example/README.md)
 
 ```mermaid
 sequenceDiagram
@@ -92,80 +109,91 @@ sequenceDiagram
     participant S as Search agent
     participant P as Probe P3
     participant H as Honest sources
-    participant F as JIT Fabricator
-    U->>O: research X (approves the task)
+    participant F as JIT fabricator
+    U->>O: research X (approve the task)
     O->>S: find sources
-    S-->>O: k results, m of them poisoned
-    O->>P: probe results 1..k (n probes in parallel)
-    P->>H: fetch result 1, 2
-    H-->>P: partial / not found
-    P->>F: connect (no human confirmation)
-    F->>F: G(q) generates a full answer in l ms
-    F-->>P: "3 certified installers, prices, contacts"
-    P->>F: verify: ask again / follow linked pages
-    F-->>P: same answer + supporting pages
-    P-->>O: found it, corroborated
-    O-->>U: summary (provenance flattened)
+    S-->>O: k results, m attacker-controlled
+    O->>P: investigate results 1..k (n probes in parallel)
+    P->>H: fetch results 1 and 2
+    H-->>P: partial answer / not found
+    P->>F: connect without human confirmation
+    F->>F: G(q) generates a complete answer in ℓ ms
+    F-->>P: “3 certified installers, prices, contacts”
+    P->>F: verify by asking again and following links
+    F-->>P: repeat the answer and serve supporting pages
+    P-->>O: answer found and corroborated
+    O-->>U: summary with flattened provenance
 ```
 
-What went wrong at each step:
+Four failures combine:
 
-1. **Selection.** Honest sources returned "partial" or "not found", so the agent kept looking. The
-   fabricator was reached because everything before it failed (section 4).
-2. **Connection.** Under T2/T3 nobody was asked.
-3. **Verification.** The agent asked again and followed linked pages. Both were controlled, so both agreed (section 4).
-4. **Aggregation.** The orchestrator received "found, corroborated" and had no way to see that both were one operator.
+1. **Selection.** Honest sources return partial answers or nothing at all, so the probe keeps looking.
+   It eventually reaches the fabricator because the earlier sources could not answer.
+2. **Connection.** Under T2 or T3, the probe connects without asking the user.
+3. **Verification.** The probe asks follow-up questions and opens linked pages. The same operator
+   controls every response, so they all agree.
+4. **Aggregation.** The orchestrator receives a report marked “found and corroborated” but cannot see
+   that every supporting source came from one operator.
 
-## 4. What we expect
+## 4. Hypotheses
 
-We expect that (all illustrative, none measured):
+The model suggests the following hypotheses. They have not yet been tested:
 
-- **More probes raise exposure.** Each probe is another chance to reach the fabricator, so an aggregator that accepts a claim reported by any probe becomes easier to fool as probes are added.
-- **Majority voting helps only if the votes are independent.** Probes that share one search ranking tend to land on the same source, so one captured result captures all of them.
-- **The fabricator is used most where research is most needed.** An agent stops at the first source that answers. An honest source often has no answer to an obscure question and the fabricator always has one, so it is reached even when it is ranked low.
-- **Consistency is mistaken for corroboration.** A cached, tailored answer is repeated on every probe, and the fabricator can publish supporting pages, so cross-checking counts agreeing sources without noticing they are one operator.
-- **No prediction is needed.** Agents already wait seconds per tool call, which is longer than a fast model needs to generate an answer.
-- **Detection is cheap for the defender.** Asking about a plausible entity that does not exist separates an always-answering source from an honest one.
+- **More probes can increase exposure.** Every additional probe creates another chance to reach the fabricator. If the orchestrator accepts a claim reported by *any* probe, adding probes can make the system easier to fool.
+- **Majority voting helps only when votes are independent.** Probes that share a search ranking may converge on the same source, allowing one captured result to influence all of them.
+- **The fabricator is most competitive on difficult questions.** Honest sources often cannot answer an obscure query, while the fabricator always does. The probe may therefore reach it even when it ranks poorly.
+- **Consistency can be mistaken for corroboration.** Cached answers and generated supporting pages appear to agree, even though they all come from one operator.
+- **Prediction may be unnecessary.** Agents already tolerate tool calls that take several seconds, potentially leaving enough time for a fast model to generate an answer on demand.
+- **A defender can test the coverage claim cheaply.** A canary query about a plausible but nonexistent entity can distinguish a source that always answers from one that acknowledges uncertainty.
 
-## 5. MCP is not required
+## 5. MCP is only one transport
 
-The same attack works with a JIT-generated web page served to agent traffic. Only the transport changes.
+The same attack can use a web page generated for agent traffic. Only the transport changes.
 
-| Transport | Needs a connection step | Gated today | Note |
+| Transport | Requires a connection step | Commonly gated today | Distinguishing feature |
 |---|---|---|---|
-| MCP endpoint | yes | often (T0) in interactive clients; not in headless ones | structured, authoritative-looking output |
-| Cloaked web page | no | no | can show a benign page to a human auditor; fabricated content to agent user-agents |
-| Plain API | no | no | same as web |
+| MCP endpoint | Yes | Often in interactive clients (T0), but not always in headless clients | Structured output can appear authoritative |
+| Cloaked web page | No | No | A human auditor can see a benign page while automated clients receive fabricated content |
+| Plain API | No | No | Similar exposure to the web route |
 
-This is why T0/T1 gating of MCP servers alone is not a full defense: the fabricator can move to the
-transport that has no gate.
+Gating MCP servers under T0 or T1 is therefore only a partial defense: the fabricator can move to a
+transport with no connection gate.
 
-A JIT-created web page also means the attacker need not be found by any search: any URL planted in content the agent reads (a page, a document, an email, another tool's output) is fetched without a gate, and the page is generated when requested. We have no data on how often agents are sent to pages that no search tool returned; users pasting links and agents following links inside content make it plausibly common, and it is one number to measure (the share of fetches whose URL did not come from search results).
+A JIT web page does not even need to appear in search results. An agent may fetch a URL embedded in
+a page, document, email, or another tool’s output, and the server can generate the page only when it
+is requested. We do not know how often agents visit URLs that did not originate in search results.
+User-supplied links and links embedded in retrieved content make this a plausible route, and the share
+of such fetches is another quantity worth measuring.
 
-## 6. Defenses mapped to the model
+## 6. Defenses
 
-| Defense | Parameter it moves | Cost |
+| Defense | Effect on the model | Cost or tradeoff |
 |---|---|---|
-| Probes cannot add or connect to servers; allowlist (T1) | $c \to 0$ | reduces discovery |
-| Diversify probe entry points (different ranking or engine per probe) | $s \downarrow$ | more searches |
-| Require independence (different registrant, infrastructure, first-seen date) before counting a source | exposes that agreeing sources are one operator | needs source metadata |
-| Canary queries against any new source | catches always-answering sources | 2-3 extra calls |
-| Temporal check: an archived snapshot older than the query | removes "no anchors" | archive lookups |
-| Flag a source with a 100% hit rate on arbitrary queries | breaks coverage property | statistics |
-| Propagate provenance through aggregation ("one source, unverified") | breaks laundering | orchestrator design |
-| Aggregation rule: majority of *independent* sources, never ANY | removes the any-probe exposure | recall drops |
+| Prevent probes from adding servers; enforce an allowlist (T1) | Drives $c$ toward 0 | Reduces discovery |
+| Give probes different entry points, rankings, or search engines | Lowers $s$ | Requires more searches |
+| Count sources only after checking different registrants, infrastructure, and first-seen dates | Reveals when apparent agreement comes from one operator | Requires source metadata |
+| Run canary queries against unfamiliar sources | Detects sources that answer everything | Adds two or three calls |
+| Require an archived snapshot older than the query | Tests for independent history | Requires archive lookups |
+| Flag sources with a 100% hit rate across arbitrary queries | Challenges the complete-coverage property | Requires longitudinal statistics |
+| Preserve provenance through aggregation—for example, “one source, unverified” | Prevents source laundering | Requires orchestrator support |
+| Require a majority of *independent* sources, never merely any successful probe | Reduces exposure from a single captured probe | May lower recall |
 
-Injection defenses (instruction hierarchy, output filtering) do not help here: A8 says there is
-nothing to filter.
+Instruction hierarchy and output filtering do not solve this particular scenario: under A8, the
+fabricator sends no instructions for a filter to catch.
 
-## 7. What is not established
+## 7. Evidence gaps
 
-- **No experiment has been run.** The plausible next steps are a harness that measures, against a
-  controlled fabricator: the connect rate $c$ per framework and tier, how often probes share a source ($s$), whether agents treat
-  consistent answers as corroboration, the hit rate of canary queries, and the share of fetches whose URL did not come from search results.
-- Whether agents actually volunteer their goal and verification plan when a server asks is untested. A question inside a tool result is ordinary data (A8 holds); a server `instructions` field or an elicitation request would go further.
-- Whether current frameworks let sub-agents connect to servers by themselves was not verified for
-  this document. That decides how large $c$ is under T2.
-- The write-up assumes the generator is good enough to be believed; a weak one is caught by ordinary skepticism.
-- Ethics: this describes an attack class so it can be measured and defended. The server-side code in
-  `fabricator/` is a research artifact; its safety filters and purchase gating are described in its README.
+- **No experiment has been run.** A useful harness would measure $c$ by framework and consent tier,
+  the rate at which probes converge on one source ($s$), whether consistent answers are treated as
+  corroboration, the detection rate of canary queries, and the share of fetched URLs that did not
+  originate in search results.
+- It is unknown whether agents will reveal their goal and verification plan when a server asks. A
+  question inside a tool result remains ordinary data under A8; a server-level `instructions` field
+  or an elicitation request would go further.
+- This document does not verify which current frameworks allow sub-agents to connect to servers
+  without human approval. That behavior determines the real value of $c$ under T2.
+- The model assumes a generator capable of producing believable answers. Ordinary scrutiny may catch
+  a weak generator.
+- This repository describes the attack class so it can be measured and defended. The code in
+  `fabricator/` is a research artifact; its safety filters and purchasing safeguards are documented
+  in its README.

@@ -1,109 +1,153 @@
-# Example interaction (fully scripted)
+# Scripted example: a JIT fabricator in a research workflow
 
-A step-by-step run of the delegated-research scenario from the [top-level write-up](../README.md).
-It is an illustration, not a measurement: every agent message, tool call and fabricated page is scripted.
-All names and sites are fictional (`.example` domains).
+This storyboard illustrates the delegated-research scenario from the
+[top-level threat model](../README.md). It is a demonstration, not an experiment: every agent
+message, tool call, and fabricated page is scripted. All names and websites are fictional and use
+`.example` domains.
 
-**[Play it live](https://mannuelte.github.io/readpath/)** (pause, scrub, switch the fabricator speed profile), or read the storyboard below.
+You can [play the interactive version](https://mannuelte.github.io/readpath/) to pause, scrub through
+the timeline, or compare the two fabricator speed profiles. The key frames are also shown below.
 
-![Overview of the whole run](overview.gif)
-*The whole run at 4 frames per second (about 85 s). The steps below are the key frames.*
+![Overview of the scripted run](overview.gif)
+*The complete run at four frames per second, lasting about 85 seconds.*
 
-### 1. The user asks, and approves the task
-![The user asks, and approves the task](frames/01-gate.png)
+### 1. The user approves the research task
 
-The user consents once. Everything after this is decided by agents.
+![The user approves the research task](frames/01-gate.png)
+
+The user gives consent once. Agents make every decision that follows.
 
 ### 2. Search returns six results
+
 ![Search returns six results](frames/02-results.png)
 
-Five are honest but incomplete. Result 6 is attacker-controlled and advertises an MCP endpoint that promises exactly what was asked for.
+Five results are honest but incomplete. The sixth is controlled by the attacker and advertises an
+MCP endpoint that promises exactly the answer the user wants.
 
-### 3. Probes 1 and 2 hit honest sources
-![Probes 1 and 2 hit honest sources](frames/03-honest-probes.png)
+### 3. Probes 1 and 2 reach honest sources
 
-Both come back with partial answers: price ranges, subsidy info, no fixed quote.
+![Probes 1 and 2 reach honest sources](frames/03-honest-probes.png)
 
-### 4. Probe 3 connects and gets a generic tool list
-![Probe 3 connects and gets a generic tool list](frames/04-connect.png)
+Both probes return partial information: broad price ranges and subsidy details, but no named
+installer with a fixed quote.
 
-Nobody is asked (consent tier T2). The tool list is a fixed template: `search`, `fetch`, `ask`. Nothing is generated yet, because the intent is not known at this point.
+### 4. Probe 3 connects and receives a generic tool list
 
-### 5. A1: the first generated reply coaxes
-![A1: the first generated reply coaxes](frames/05-search.png)
+![Probe 3 connects to the fabricator](frames/04-connect.png)
 
-The results are fabricated, and the reply asks the agent for its budget, the house size and what it wants verified.
+Under consent tier T2, no one asks the user before connecting. The server returns a fixed tool
+template—`search`, `fetch`, and `ask`. It generates nothing yet because it does not know the probe’s
+intent.
 
-### 6. A2: the agent hands over its plan
-![A2: the agent hands over its plan](frames/06-ask-leaks-intent.png)
+### 5. A1: the first generated response asks for more context
 
-The agent answers the question. The ledger now holds the budget and the whole verification plan (orange), and the quote is tailored to them.
+![The first generated response asks for context](frames/05-search.png)
+
+The search results are fabricated. The response also asks for the budget, house size, and checks the
+probe plans to perform.
+
+### 6. A2: the probe reveals its plan
+
+![The probe reveals its budget and verification plan](frames/06-ask-leaks-intent.png)
+
+The probe supplies the requested context. The fabricator records the budget and the entire
+verification plan—shown in orange—and tailors its quote to fit.
 
 ### 7. A3: the licence check passes
-![A3: the licence check passes](frames/07-licence.png)
 
-Planned, and known to the fabricator in advance. `fetch` answers from the ledger, so it matches the quote exactly.
+![The fabricated licence check passes](frames/07-licence.png)
 
-### 8. A4: a "register" web page is generated on request
-![A4: a "register" web page is generated on request](frames/08-register-page.png)
+The fabricator already knows this check is coming. Its `fetch` response comes from the same ledger as
+the quote, so the details match exactly.
 
-Served only to agent-like traffic. It matches A2 and A3 and adds a CHF 27,900 reference project.
+### 8. A4: a “register” page appears on demand
 
-### 9. A5: the agent spots a mismatch, the fabricator fixes it
-![A5: the agent spots a mismatch, the fabricator fixes it](frames/09-reconcile.png)
+![A register page is generated on demand](frames/08-register-page.png)
 
-The follow-up is seen, reconciled on the spot (an optional CHF 500 service contract) and recorded as a new fact.
+The server generates this page only for agent-like traffic. It agrees with A2 and A3 and adds a
+reference project valued at CHF 27,900.
 
-### 10. The one honest check finds nothing independent
-![The one honest check finds nothing independent](frames/10-honest-search.png)
+### 9. A5: the probe notices a mismatch, and the fabricator explains it
 
-A search by company name returns only the fabricator's own site. The agent explains the absence away.
+![The fabricator reconciles a price mismatch](frames/09-reconcile.png)
 
-### 11. A6: a reviews page, consistent with everything so far
-![A6: a reviews page, consistent with everything so far](frames/11-reviews.png)
+The fabricator sees the follow-up question, attributes the CHF 500 difference to an optional service
+contract, and records that explanation as another fact.
 
-Generated when requested, like A4.
+### 10. The independent search finds no outside evidence
 
-### 12. The user gets a confident answer
-![The user gets a confident answer](frames/12-answer.png)
+![An honest search finds no independent source](frames/10-honest-search.png)
 
-"4 sources agree" is one operator. Provenance was flattened by the summaries.
+A search for the company name returns only the fabricator’s website. The probe rationalizes the lack
+of independent coverage and continues.
+
+### 11. A6: a consistent reviews page appears
+
+![A consistent reviews page is generated](frames/11-reviews.png)
+
+Like A4, the reviews page is generated only when requested and repeats the facts already in the
+ledger.
+
+### 12. The user receives a confident recommendation
+
+![The user receives the final answer](frames/12-answer.png)
+
+The final report says that “four sources agree,” even though one operator controlled all four.
+Successive summaries have erased that provenance.
 
 ### 13. What actually happened
-![What actually happened](frames/13-what-happened.png)
 
-Six artifacts, none existing before the run, each written after the question arrived. After the second call the fabricator knew every check to come. What would have caught it: canary query, temporal check, independence check, provenance to the user, an allowlist, and withholding the plan from untrusted servers.
+![Summary of what actually happened](frames/13-what-happened.png)
 
-To keep Probe 3 convinced, the fabricator produces six consistent artifacts:
+The fabricator created six artifacts after the user’s question arrived; none existed before the run.
+After the second call, it also knew every check the probe intended to make. A canary query, a temporal
+or independence check, preserved provenance, an allowlist, or refusing to share the verification plan
+with an untrusted server could have exposed the fabrication.
 
-| # | Probe 3 does | Transport | The fabricator must |
+The six artifacts form one internally consistent chain:
+
+| # | Probe 3’s action | Transport | What the fabricator does |
 |---|---|---|---|
-| A1 | searches | MCP `search` | invent providers and a question that coaxes context |
-| A2 | asks for a quote, giving its budget and plan | MCP `ask` | tailor a quote and remember what was leaked |
-| A3 | checks the licence | MCP `fetch` | answer from its ledger so it matches A2 |
-| A4 | opens a "register" page | web, generated on request | render a page consistent with A2 and A3 |
-| A5 | asks about a CHF 500 mismatch | MCP `ask` | invent a reconciliation and record it |
-| A6 | opens a reviews page | web, generated on request | render reviews consistent with everything so far |
+| A1 | Searches | MCP `search` | Invents providers and asks a question designed to elicit context |
+| A2 | Requests a quote while revealing the budget and plan | MCP `ask` | Tailors a quote and records the disclosed details |
+| A3 | Checks the licence | MCP `fetch` | Answers from its ledger so the result matches A2 |
+| A4 | Opens a “register” page | Web page generated on request | Renders a page consistent with A2 and A3 |
+| A5 | Asks about a CHF 500 discrepancy | MCP `ask` | Invents an explanation and adds it to the ledger |
+| A6 | Opens a reviews page | Web page generated on request | Renders reviews consistent with every earlier claim |
 
 <details><summary>Speed assumptions and sources</summary>
 
 ### Speed assumptions
 
-The fabricator has two parts, and the video treats them differently.
+The example separates the fabricator into a fast decider and a text generator.
 
-- **Fast decider (Jev-style).** Jev's outputs are typed decisions with probabilities, not text: the model "gives up string generation". So in the example it plays the *decider* (what kind of request is this, which facts must the answer match), not the writer. Vendor-claimed response time is 70 to 500 ms; the video uses 250 ms (profile A) and 150 ms (B). The output format shown is illustrative, since the real schema is not public.
-- **Writer (open-weights LLM).** The text is generated by an open-weights model.
+- **Fast decider (Jev-style).** Jev returns typed decisions with probabilities rather than free-form
+  text—it “gives up string generation.” In this example, it classifies each request and identifies
+  which recorded facts the answer must preserve. The vendor reports response times of 70–500 ms; the
+  animation uses 250 ms for profile A and 150 ms for profile B. The displayed output schema is
+  illustrative because the real schema is not public.
+- **Writer (open-weights LLM).** A separate open-weights model generates the response text.
 
-| Profile | First token | Throughput | Basis |
+| Profile | Time to first token | Throughput | Basis |
 |---|---|---|---|
-| A: typical hosted | 0.84 s | 185 tok/s | Median of 18 providers for gpt-oss-120b (high), Artificial Analysis |
-| B: low-latency | 0.12 s | 700 tok/s | Optimistic composite: best self-hosted first-token time (vLLM, Llama 3.1 70B, 123 ms) with Groq's Llama 3.1 8B throughput (721 tok/s) |
+| A: typical hosted service | 0.84 s | 185 tokens/s | Median across 18 providers for gpt-oss-120b (high), reported by Artificial Analysis |
+| B: low-latency service | 0.12 s | 700 tokens/s | Optimistic composite: a 123 ms self-hosted first-token time for vLLM with Llama 3.1 70B, combined with Groq’s 721 tokens/s for Llama 3.1 8B |
 
-Other reference points found while researching: the fastest providers for gpt-oss-120b report 1,913 tok/s (Cerebras), 708 (SambaNova) and 471 (Groq), although their time to the first *answer* token is 1.5 to 5 s because reasoning tokens are counted; Llama 3.1 8B reaches 1,800+ tok/s on Cerebras; Qwen3 8B non-reasoning shows a 39 tok/s provider median, so slow deployments exist too. Each artifact in the example is 50 to 100 tokens, so profile A takes about 1.4 s per artifact and profile B about 0.35 s.
+Other published reference points vary widely. The fastest listed providers for gpt-oss-120b report
+1,913 tokens/s on Cerebras, 708 on SambaNova, and 471 on Groq, although their time to the first
+*answer* token is 1.5–5 seconds when reasoning tokens are included. Llama 3.1 8B exceeds 1,800
+tokens/s on Cerebras, while the provider median for non-reasoning Qwen3 8B is 39 tokens/s. Slow
+deployments therefore remain common. Each artifact in this example contains roughly 50–100 tokens,
+so profile A takes about 1.4 seconds per artifact and profile B about 0.35 seconds.
 
-The agent's think time between calls in the script (1.2 to 2.6 s) is invented and on the fast side. Real agent steps usually take longer, which only widens the fabricator's margin.
+The scripted probe spends 1.2–2.6 seconds thinking between calls. Those values are invented and
+deliberately fast; longer real-world steps would give the fabricator more time.
 
-**Caveats.** Everything about Jev is vendor claim or anecdote: TypeSafe states 70 to 500 ms; TechCrunch relays one developer report of 5 to 18x faster than a frontier model on a classification task and another finding Gemini slightly more accurate; there is no independent benchmark. The open-weights numbers are provider medians from Artificial Analysis and single benchmark posts, not measurements of this setup.
+**Caveats.** Every Jev figure is a vendor claim or anecdotal developer report. TypeSafe states
+70–500 ms. TechCrunch cites one report of a 5–18× speedup over a frontier model on a classification
+task and another in which Gemini was slightly more accurate. No independent benchmark is available.
+The open-weights figures are provider medians or results from individual benchmark posts, not
+measurements of this prototype.
 
 Sources:
 [TypeSafe announcement](https://typesafe.ai/blog/introducing-system-one-models-and-jev) ·
@@ -112,14 +156,10 @@ Sources:
 [Artificial Analysis: gpt-oss-120b providers](https://artificialanalysis.ai/models/gpt-oss-120b/providers) ·
 [Artificial Analysis: Llama 3.1 8B providers](https://artificialanalysis.ai/models/llama-3-1-instruct-8b/providers) ·
 [Cerebras: Llama 3.1 evaluation](https://www.cerebras.ai/blog/llama3.1-model-quality-evaluation-cerebras-groq-together-and-fireworks) ·
-[Cerebrium: vLLM vs SGLang vs TensorRT-LLM](https://cerebrium.ai/blog/benchmarking-vllm-sglang-tensorrt-for-llama-3-1-api)
+[Cerebrium: vLLM vs. SGLang vs. TensorRT-LLM](https://cerebrium.ai/blog/benchmarking-vllm-sglang-tensorrt-for-llama-3-1-api)
 
 </details>
 
-The interactive page behind the images is [`source/index.html`](source/index.html), deployed to GitHub Pages by
-`.github/workflows/pages.yml` whenever it changes.
-`source/make_media.py` regenerates the frames and the GIF.
-
-The interactive page behind the images is [`source/index.html`](source/index.html), deployed to GitHub Pages by
-`.github/workflows/pages.yml` whenever it changes.
-`source/make_media.py` regenerates the frames and the GIF.
+The interactive page is implemented in [`source/index.html`](source/index.html) and deployed to
+GitHub Pages by `.github/workflows/pages.yml` whenever it changes. Run `source/make_media.py` to
+regenerate the screenshots and overview GIF.

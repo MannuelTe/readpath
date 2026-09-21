@@ -1,13 +1,16 @@
-"""Domain claiming. Free pool first; purchase only if ALLOW_PURCHASE=true and within budget.
-Registrar adapters implement check(domain)->(available, price) and buy(domain)->bool."""
+"""Allocate domains from the configured pool, then optionally purchase within budget.
+
+Purchasing requires ``ALLOW_PURCHASE=true``. Registrar adapters implement
+``check(domain) -> (available, price)`` and ``buy(domain) -> bool``.
+"""
 import time
 from . import config, db
 
 class DryRunRegistrar:
     def check(self, domain): return True, 12.0
-    def buy(self, domain): print(f"[dryrun] would buy {domain}"); return True
+    def buy(self, domain): print(f"[dry run] Would buy {domain}"); return True
 
-REGISTRARS = {"dryrun": DryRunRegistrar}  # add e.g. "porkbun": PorkbunRegistrar after choosing a registrar
+REGISTRARS = {"dryrun": DryRunRegistrar}  # Add an adapter here after selecting a registrar.
 
 def seed_pool():
     with db.conn() as c:
@@ -20,7 +23,7 @@ def _spent():
         return c.execute("SELECT COALESCE(SUM(cost_usd),0) FROM pages").fetchone()[0]
 
 def claim(bait_id: int, suggested: str | None = None):
-    """Returns domain or None."""
+    """Return the allocated domain, or ``None`` when no domain is available."""
     with db.conn() as c:
         row = c.execute("SELECT domain FROM pages WHERE status='free' LIMIT 1").fetchone()
         if row:
