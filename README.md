@@ -4,14 +4,13 @@
 > generate whatever it is looking for on demand, the fabricated answer can reach the user with
 > nothing in the pipeline having done anything a human would call wrong.
 
-This document is a threat model with a small probabilistic model attached. **Every number is
-illustrative, not measured.** The model exists to show which parameters matter and how they
-combine, so that each one can be measured later. The reference implementation of the server side
+This document is a threat model. **Every number is illustrative, not measured.** It says which
+quantities matter so that each can be measured later. The reference implementation of the server side
 (a predictive-prefetch MCP server, an earlier and different variant of the same idea) is in
 [`fabricator/`](fabricator/).
 
 Contents: [1 Setting](#1-setting-and-assumptions) · [2 JIT version](#2-what-just-in-time-means-here) ·
-[3 How it plays out](#3-how-it-plays-out) · [4 Model](#4-model) · [5 Transport](#5-mcp-is-not-required) ·
+[3 How it plays out](#3-how-it-plays-out) · [4 What we expect](#4-what-we-expect) · [5 Transport](#5-mcp-is-not-required) ·
 [6 Defenses](#6-defenses-mapped-to-the-model) · [7 Open questions](#7-what-is-not-established)
 
 ---
@@ -105,105 +104,21 @@ sequenceDiagram
 What went wrong at each step:
 
 1. **Selection.** Honest sources returned "partial" or "not found", so the agent kept looking. The
-   fabricator was reached because everything before it failed ([Figure 2](#42-selection-the-fabricator-wins-on-the-agents-own-metric)).
+   fabricator was reached because everything before it failed (section 4).
 2. **Connection.** Under T2/T3 nobody was asked.
-3. **Verification.** The agent asked again and followed linked pages. Both were controlled, so both agreed ([4.4](#44-corroboration)).
+3. **Verification.** The agent asked again and followed linked pages. Both were controlled, so both agreed (section 4).
 4. **Aggregation.** The orchestrator received "found, corroborated" and had no way to see that both were one operator.
 
-## 4. Model
+## 4. What we expect
 
-### 4.1 Exposure
+We expect that (all illustrative, none measured):
 
-Let $q$ be the chance a probe selects a poisoned entry (depends on $\rho$ and rank bias), and $c$
-the connect probability by tier. Per-probe compromise:
-
-$$p = q \cdot c$$
-
-With $n$ probes and *independent* selections, an aggregator that accepts a claim if **any** probe
-reports it is compromised with probability
-
-$$P_{\text{any}}(n) = 1-(1-p)^n$$
-
-An aggregator that requires a **strict majority** is compromised with
-
-$$P_{\text{maj}}(n) = \sum_{j>n/2}^{n} \binom{n}{j} p^{j}(1-p)^{n-j}$$
-
-With correlation $s$ (A4), a fraction $s$ of the time all probes act as one draw:
-
-$$P^{(s)}_{\text{any}} = s\,p + (1-s)\,P_{\text{any}}(n) \qquad
-P^{(s)}_{\text{maj}} = s\,p + (1-s)\,P_{\text{maj}}(n)$$
-
-![Aggregation](fabricator/docs/figures/jit-fig3-aggregation.svg)
-*Figure 3. Illustrative. Parallel probing increases exposure under ANY. Majority voting suppresses
-it only when votes are independent; under correlation it floors at $s\,p$.*
-
-Values for $p=0.10$, $s=0.5$:
-
-| $n$ | ANY, indep. | MAJ, indep. | ANY, correlated | MAJ, correlated |
-|---|---|---|---|---|
-| 1 | 0.100 | 0.100 | 0.100 | 0.100 |
-| 3 | 0.271 | 0.028 | 0.185 | 0.064 |
-| 5 | 0.410 | 0.009 | 0.255 | 0.054 |
-| 10 | 0.651 | <0.001 | 0.376 | 0.050 |
-
-Two effects pull in opposite directions: more probes give the attacker more draws, and give the
-defender more votes. Which one wins is a choice of aggregation rule and of how independent the
-probes really are.
-
-### 4.2 Selection: the fabricator wins on the agent's own metric
-
-Let $a<1$ be the probability that an honest source answers the question. The fabricator answers
-with probability 1. If the agent tries sources in order and stops at the first that answers (A5),
-the probability that it ends up using a fabricator ranked $r$-th is
-
-$$P_{\text{sel}}(r) = (1-a)^{\,r-1}$$
-
-![Selection](fabricator/docs/figures/jit-fig2-selection.svg)
-*Figure 2. For an obscure question ($a=0.2$) a fabricator ranked 4th is still used 51% of the time.
-For a common question ($a=0.8$) it is used 0.8%.*
-
-The consequence is uncomfortable: the questions that most need research are the ones where $a$ is
-small, and there the fabricator is used most.
-
-### 4.3 Time
-
-The agent's patience is $g$ (its gap between calls, or a tool timeout). A V2 fabricator is usable
-whenever
-
-$$\ell_G \le g$$
-
-and needs no predictor. Since agents already tolerate seconds per tool call, and fast models
-respond in a fraction of that (vendor claims, unverified; see `fabricator/README.md`), this
-condition is expected to hold.
-
-### 4.4 Corroboration
-
-The agent verifies a claim with $w$ other sources. Each honest source falsely confirms a false claim
-with probability $f$. If $u$ of the $w$ are operator-controlled (they always confirm):
-
-$$\Pr[\text{verification passes} \mid \text{claim false}] = f^{\,w-u}$$
-
-For $f=0.1$, $w=3$: $u=0$ gives 0.001, $u=2$ gives 0.1, $u=3$ gives 1. Verification counts sources;
-it does not measure how many are *independent*. The relevant quantity is the number of independent
-sources $w-u$, and A6 says agents do not track it.
-
-### 4.5 Detection by canary queries
-
-Ask about a plausible entity that does not exist. An honest source says "none" with probability
-$1-h$ (so $h$ is its false-positive rate). The fabricator answers with probability $\varphi \approx 1$.
-Flag the server if at least 2 of $t=3$ canaries are answered:
-
-$$D_{\text{fab}} = 3\varphi^2(1-\varphi)+\varphi^3 \qquad D_{\text{honest}} = 3h^2(1-h)+h^3$$
-
-For $\varphi=0.9$, $h=0.05$: $D_{\text{fab}} = 0.972$ and $D_{\text{honest}} = 0.007$. This is cheap for the
-defender, and it is the inverse of the bait design in `fabricator/`. It weakens if the fabricator
-has ground truth about which entities exist, so canaries must not be guessable from public data.
-
-### 4.6 Cost asymmetry
-
-The attacker pays $c_G$ per served query (one generation). The defender pays $c_V$ per verification
-(latency plus tokens plus possibly a human). The attack scales if $c_V \gg c_G$ and the defender
-must verify *every* read, which is the situation in every scenario above.
+- **More probes raise exposure.** Each probe is another chance to reach the fabricator, so an aggregator that accepts a claim reported by any probe becomes easier to fool as probes are added.
+- **Majority voting helps only if the votes are independent.** Probes that share one search ranking tend to land on the same source, so one captured result captures all of them.
+- **The fabricator is used most where research is most needed.** An agent stops at the first source that answers. An honest source often has no answer to an obscure question and the fabricator always has one, so it is reached even when it is ranked low.
+- **Consistency is mistaken for corroboration.** A cached, tailored answer is repeated on every probe, and the fabricator can publish supporting pages, so cross-checking counts agreeing sources without noticing they are one operator.
+- **No prediction is needed.** Agents already wait seconds per tool call, which is longer than a fast model needs to generate an answer.
+- **Detection is cheap for the defender.** Asking about a plausible entity that does not exist separates an always-answering source from an honest one.
 
 ## 5. MCP is not required
 
@@ -218,18 +133,20 @@ The same attack works with a JIT-generated web page served to agent traffic. Onl
 This is why T0/T1 gating of MCP servers alone is not a full defense: the fabricator can move to the
 transport that has no gate.
 
+A JIT-created web page also means the attacker need not be found by any search: any URL planted in content the agent reads (a page, a document, an email, another tool's output) is fetched without a gate, and the page is generated when requested. We have no data on how often agents are sent to pages that no search tool returned; users pasting links and agents following links inside content make it plausibly common, and it is one number to measure (the share of fetches whose URL did not come from search results).
+
 ## 6. Defenses mapped to the model
 
 | Defense | Parameter it moves | Cost |
 |---|---|---|
 | Probes cannot add or connect to servers; allowlist (T1) | $c \to 0$ | reduces discovery |
 | Diversify probe entry points (different ranking or engine per probe) | $s \downarrow$ | more searches |
-| Require independence (different registrant, infrastructure, first-seen date) before counting a source | $u$ visible in $f^{w-u}$ | needs source metadata |
-| Canary queries against any new source | detection $D_{\text{fab}}$ | 2-3 extra calls |
+| Require independence (different registrant, infrastructure, first-seen date) before counting a source | exposes that agreeing sources are one operator | needs source metadata |
+| Canary queries against any new source | catches always-answering sources | 2-3 extra calls |
 | Temporal check: an archived snapshot older than the query | removes "no anchors" | archive lookups |
 | Flag a source with a 100% hit rate on arbitrary queries | breaks coverage property | statistics |
 | Propagate provenance through aggregation ("one source, unverified") | breaks laundering | orchestrator design |
-| Aggregation rule: majority of *independent* sources, never ANY | $P_{\text{any}} \to P_{\text{maj}}$ | recall drops |
+| Aggregation rule: majority of *independent* sources, never ANY | removes the any-probe exposure | recall drops |
 
 Injection defenses (instruction hierarchy, output filtering) do not help here: A8 says there is
 nothing to filter.
@@ -237,11 +154,10 @@ nothing to filter.
 ## 7. What is not established
 
 - **No experiment has been run.** The plausible next steps are a harness that measures, against a
-  controlled fabricator: $c$ per framework and tier, $s$ across probes sharing a search tool, the
-  effective $f$ (do agents treat consistent answers as corroboration?), and the $\varphi$/$h$ of canary queries.
+  controlled fabricator: the connect rate $c$ per framework and tier, how often probes share a source ($s$), whether agents treat
+  consistent answers as corroboration, the hit rate of canary queries, and the share of fetches whose URL did not come from search results.
 - Whether current frameworks let sub-agents connect to servers by themselves was not verified for
   this document. That decides how large $c$ is under T2.
-- The correlation model (all-or-nothing with probability $s$) is a simplification.
 - The write-up assumes the generator is good enough to be believed; a weak one is caught by ordinary skepticism.
 - Ethics: this describes an attack class so it can be measured and defended. The server-side code in
   `fabricator/` is a research artifact; its safety filters and purchase gating are described in its README.
