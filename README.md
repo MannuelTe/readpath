@@ -77,6 +77,7 @@ this), V2 becomes strictly easier than V1: the predictor drops out of the attack
 
 A concrete run. The user asks: *"Which installers of X are certified in Zurich, and what do they
 charge?"* Suppose no source on the open web has a good answer (an obscure question).
+A scripted, step-by-step version with five fabricated verifications is in [`example/`](example/) (video and interactive page).
 
 ```mermaid
 sequenceDiagram
