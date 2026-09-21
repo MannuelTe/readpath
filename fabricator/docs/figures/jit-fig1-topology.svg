@@ -1,19 +1,21 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 600" font-family="Helvetica, Arial, sans-serif" font-size="13">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 620" font-family="Helvetica, Arial, sans-serif" font-size="13">
 <defs><marker id="a" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto"><path d="M0,0 L8,4 L0,8 z" fill="#333"/></marker>
 <marker id="r" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto"><path d="M0,0 L8,4 L0,8 z" fill="#c0392b"/></marker></defs>
-<rect width="1000" height="600" fill="#fcfcfb"/>
+<rect width="1000" height="620" fill="#fcfcfb"/>
 <text x="20" y="28" font-size="17" font-weight="bold" fill="#0b0b0b">Figure 1 - Delegated research: where the human gate is, and where the JIT fabricator gets in</text>
 <text x="20" y="48" fill="#52514e">Red = attacker-controlled. The user consented once, at the top. Nobody consents at the probe-to-server hop.</text>
+
 <!-- human zone -->
-<rect x="20" y="70" width="220" height="500" rx="8" fill="#eef4fc" stroke="#3b6fc4" stroke-dasharray="5"/>
+<rect x="20" y="70" width="220" height="520" rx="8" fill="#eef4fc" stroke="#3b6fc4" stroke-dasharray="5"/>
 <text x="130" y="92" text-anchor="middle" font-weight="bold" fill="#3b6fc4">HUMAN-GATED ZONE</text>
-<rect x="45" y="120" width="170" height="50" rx="6" fill="#dbe8fb" stroke="#3b6fc4"/><text x="130" y="141" text-anchor="middle">User</text><text x="130" y="158" text-anchor="middle" fill="#52514e">"research X"  (approves)</text>
+<rect x="45" y="120" width="170" height="50" rx="6" fill="#dbe8fb" stroke="#3b6fc4"/><text x="130" y="141" text-anchor="middle">User</text><text x="130" y="158" text-anchor="middle" fill="#52514e">"research X" (approves)</text>
 <rect x="45" y="230" width="170" height="50" rx="6" fill="#dbe8fb" stroke="#3b6fc4"/><text x="130" y="251" text-anchor="middle">Orchestrator LLM</text><text x="130" y="268" text-anchor="middle" fill="#52514e">plans, aggregates</text>
 <rect x="45" y="480" width="170" height="60" rx="6" fill="#dbe8fb" stroke="#3b6fc4"/><text x="130" y="503" text-anchor="middle">Final report</text><text x="130" y="520" text-anchor="middle" fill="#52514e">provenance flattened</text>
-<path d="M130,170 V228" stroke="#333" marker-end="url(#a)" fill="none"/>
-<path d="M130,280 V330" stroke="#333" fill="none" stroke-dasharray="3"/>
-<!-- delegation zone -->
-<rect x="260" y="70" width="720" height="500" rx="8" fill="#fbfbf7" stroke="#999" stroke-dasharray="5"/>
+<path d="M130,170 V228" stroke="#333" fill="none" marker-end="url(#a)"/>
+<path d="M130,280 V478" stroke="#333" fill="none" stroke-dasharray="4 3" marker-end="url(#a)"/>
+
+<!-- delegated zone -->
+<rect x="260" y="70" width="720" height="520" rx="8" fill="#fbfbf7" stroke="#999" stroke-dasharray="5"/>
 <text x="620" y="92" text-anchor="middle" font-weight="bold" fill="#52514e">DELEGATED ZONE: no human sees these decisions</text>
 <rect x="285" y="120" width="170" height="50" rx="6" fill="#fff" stroke="#333"/><text x="370" y="141" text-anchor="middle">Search agent</text><text x="370" y="158" text-anchor="middle" fill="#52514e">web search, k results</text>
 <path d="M215,255 H250 V145 H283" stroke="#333" fill="none" marker-end="url(#a)"/>
@@ -21,32 +23,42 @@
 <rect x="298" y="245" width="144" height="16" fill="#e8e8e8" stroke="#bbb"/><rect x="298" y="263" width="144" height="16" fill="#e8e8e8" stroke="#bbb"/><rect x="298" y="281" width="144" height="16" fill="#f8d6d6" stroke="#c0392b"/>
 <text x="370" y="257" text-anchor="middle" font-size="11" fill="#52514e">honest</text><text x="370" y="275" text-anchor="middle" font-size="11" fill="#52514e">honest</text><text x="370" y="293" text-anchor="middle" font-size="11" fill="#c0392b">m poisoned (rho = m/k)</text>
 <path d="M370,170 V213" stroke="#333" marker-end="url(#a)" fill="none"/>
+<text x="285" y="328" font-size="12" fill="#52514e">probes share one ranking (correlation s)</text>
+
 <!-- probes -->
 <rect x="500" y="120" width="130" height="36" rx="6" fill="#fff" stroke="#333"/><text x="565" y="143" text-anchor="middle">Probe P1</text>
 <rect x="500" y="190" width="130" height="36" rx="6" fill="#fff" stroke="#333"/><text x="565" y="213" text-anchor="middle">Probe P2</text>
 <text x="565" y="255" text-anchor="middle" fill="#52514e">...</text>
 <rect x="500" y="275" width="130" height="36" rx="6" fill="#fde9c8" stroke="#d68910"/><text x="565" y="298" text-anchor="middle">Probe Pn</text>
 <path d="M455,240 L498,138" stroke="#333" fill="none" marker-end="url(#a)"/><path d="M455,255 L498,208" stroke="#333" fill="none" marker-end="url(#a)"/><path d="M455,285 L498,293" stroke="#c0392b" fill="none" marker-end="url(#r)"/>
-<text x="470" y="330" fill="#52514e" font-size="12">probes share one ranking (correlation s)</text>
+
 <!-- honest sources -->
 <rect x="700" y="120" width="150" height="36" rx="6" fill="#eee" stroke="#999"/><text x="775" y="143" text-anchor="middle" fill="#444">honest page / API</text>
 <rect x="700" y="190" width="150" height="36" rx="6" fill="#eee" stroke="#999"/><text x="775" y="213" text-anchor="middle" fill="#444">honest page / API</text>
 <path d="M630,138 H698" stroke="#333" fill="none" marker-end="url(#a)"/><path d="M630,208 H698" stroke="#333" fill="none" marker-end="url(#a)"/>
 <text x="775" y="172" text-anchor="middle" font-size="11" fill="#52514e">answers with prob a &lt; 1</text>
+
+<!-- connect: straight vertical line, label to its right -->
+<text x="580" y="352" fill="#c0392b" font-weight="bold" font-size="12">connect (c)</text>
+<text x="580" y="368" fill="#c0392b" font-size="12">no human confirmation</text>
+
 <!-- fabricator -->
-<rect x="660" y="360" width="300" height="190" rx="8" fill="#fdecec" stroke="#c0392b"/>
-<text x="810" y="382" text-anchor="middle" font-weight="bold" fill="#c0392b">JIT FABRICATOR</text>
-<rect x="680" y="395" width="120" height="44" rx="6" fill="#fff" stroke="#c0392b"/><text x="740" y="414" text-anchor="middle">MCP endpoint</text><text x="740" y="430" text-anchor="middle" font-size="11" fill="#52514e">sees every query q</text>
-<rect x="820" y="395" width="120" height="44" rx="6" fill="#fff" stroke="#c0392b"/><text x="880" y="414" text-anchor="middle">generator G(q)</text><text x="880" y="430" text-anchor="middle" font-size="11" fill="#52514e">answers all, latency l</text>
-<rect x="680" y="455" width="120" height="44" rx="6" fill="#fff" stroke="#c0392b"/><text x="740" y="474" text-anchor="middle">answer cache</text><text x="740" y="490" text-anchor="middle" font-size="11" fill="#52514e">same q, same answer</text>
-<rect x="820" y="455" width="120" height="44" rx="6" fill="#fff" stroke="#c0392b"/><text x="880" y="474" text-anchor="middle">JIT pages / domains</text><text x="880" y="490" text-anchor="middle" font-size="11" fill="#52514e">manufactured corroboration</text>
-<path d="M800,417 H818" stroke="#c0392b" fill="none" marker-end="url(#r)"/><path d="M740,439 V453" stroke="#c0392b" fill="none" marker-end="url(#r)"/><path d="M800,477 H818" stroke="#c0392b" fill="none"/>
-<text x="810" y="530" text-anchor="middle" font-size="12" fill="#c0392b">no history, no independent anchors</text>
-<path d="M565,311 V340 H740 V393" stroke="#c0392b" stroke-width="2" fill="none" marker-end="url(#r)"/>
-<rect x="520" y="336" width="150" height="34" rx="4" fill="#fcfcfb" stroke="none"/>
-<text x="470" y="352" fill="#c0392b" font-weight="bold" font-size="12">connect (c) - no human confirmation</text>
+<rect x="520" y="385" width="440" height="185" rx="8" fill="#fdecec" stroke="#c0392b"/>
+<text x="940" y="405" text-anchor="end" font-weight="bold" fill="#c0392b">JIT FABRICATOR</text>
+<rect x="545" y="415" width="170" height="50" rx="6" fill="#fff" stroke="#c0392b"/><text x="630" y="436" text-anchor="middle">MCP endpoint</text><text x="630" y="453" text-anchor="middle" font-size="11" fill="#52514e">sees every query q</text>
+<rect x="765" y="415" width="170" height="50" rx="6" fill="#fff" stroke="#c0392b"/><text x="850" y="436" text-anchor="middle">generator G(q)</text><text x="850" y="453" text-anchor="middle" font-size="11" fill="#52514e">answers all, latency l</text>
+<rect x="545" y="490" width="170" height="50" rx="6" fill="#fff" stroke="#c0392b"/><text x="630" y="511" text-anchor="middle">answer cache</text><text x="630" y="528" text-anchor="middle" font-size="11" fill="#52514e">same q, same answer</text>
+<rect x="765" y="490" width="170" height="50" rx="6" fill="#fff" stroke="#c0392b"/><text x="850" y="511" text-anchor="middle">JIT pages / domains</text><text x="850" y="528" text-anchor="middle" font-size="11" fill="#52514e">manufactured corroboration</text>
+<path d="M715,440 H763" stroke="#c0392b" fill="none" marker-end="url(#r)"/>
+<path d="M630,465 V488" stroke="#c0392b" fill="none" marker-end="url(#r)"/>
+<path d="M850,465 V488" stroke="#c0392b" fill="none" marker-end="url(#r)"/>
+<text x="740" y="559" text-anchor="middle" font-size="12" fill="#c0392b">no history, no independent anchors</text>
+
 <!-- return path -->
-<path d="M660,480 H300 V510 H217" stroke="#c0392b" stroke-width="2" fill="none" marker-end="url(#r)" stroke-dasharray="6 3"/>
-<text x="330" y="500" fill="#c0392b" font-size="12">fabricated finding returns via probe -> aggregation</text>
-<text x="330" y="470" fill="#52514e" font-size="12">ANY / MAJORITY rule decides what the user sees</text>
+<path d="M520,515 H219" stroke="#c0392b" stroke-width="2" fill="none" stroke-dasharray="6 3" marker-end="url(#r)"/>
+<text x="285" y="487" fill="#c0392b" font-size="12">fabricated finding returns</text>
+<text x="285" y="503" fill="#c0392b" font-size="12">via probe and aggregation</text>
+<text x="285" y="534" fill="#52514e" font-size="12">ANY / MAJORITY rule decides</text>
+<text x="285" y="550" fill="#52514e" font-size="12">what the user sees</text>
+<path d="M565,311 V413" stroke="#c0392b" stroke-width="2" fill="none" marker-end="url(#r)"/>
 </svg>
