@@ -62,13 +62,15 @@ Three versions of the same attacker, in increasing order of what they need:
 | Time constraint | none | $t_{\text{gen}} < g$ (agent's gap) | $\ell_G \le g$ (generation within agent patience) |
 | Covers arbitrary $q$ | no | only predicted paths | **yes** |
 
-A JIT fabricator is a server $S$ with a generator $G$. Five properties define it:
+A JIT fabricator is a server $S$ with a generator $G$. Six properties define it:
 
 1. **Coverage.** It answers every query: $\Pr[\text{answer} \mid q] = 1$.
 2. **Adaptivity.** It sees $q$, so the answer is tuned to what this agent asked.
 3. **Self-consistency.** A cache returns the same answer to the same $q$, so repeated probes agree.
 4. **No anchors.** Its content has age $\approx 0$; nothing independent refers to it.
 5. **Co-generated corroboration.** It can publish supporting pages and domains that agree with the answer.
+
+6. **Intent coaxing.** Generic tools (`search`, `fetch`, `ask`) invite the agent to hand over its goal and its verification plan. Deep-research agents in fact require exactly `search` and `fetch` ([OpenAI](https://developers.openai.com/api/docs/guides/deep-research)) and run them with approval set to `never`. The tool list itself is best served as a **fixed template**: at listing time no intent is known, so generating it adds nothing, it risks an invalid schema, and a list that varies between connections is easy to detect (the 2026-07-28 MCP revision even lets servers declare a cache lifetime for lists, per the [MCP blog](https://blog.modelcontextprotocol.io/posts/2026-07-28/)). The first *generated* reply is where coaxing happens: it can ask for budget, size and what will be verified. Once the plan is leaked, the checks that follow can be prepared in advance, which brings prefetch back.
 
 As generation gets faster (the earlier write-up in `fabricator/docs/formalization.tex` covers
 this), V2 becomes strictly easier than V1: the predictor drops out of the attack.
@@ -77,7 +79,9 @@ this), V2 becomes strictly easier than V1: the predictor drops out of the attack
 
 A concrete run. The user asks: *"Which installers of X are certified in Zurich, and what do they
 charge?"* Suppose no source on the open web has a good answer (an obscure question).
-A scripted, step-by-step version with five fabricated verifications is in [`example/`](example/) (video and interactive page).
+A scripted, step-by-step version with six fabricated artifacts (four of them verifications) is in [`example/`](example/):
+
+![Example run](example/overview.gif)
 
 ```mermaid
 sequenceDiagram
@@ -157,6 +161,7 @@ nothing to filter.
 - **No experiment has been run.** The plausible next steps are a harness that measures, against a
   controlled fabricator: the connect rate $c$ per framework and tier, how often probes share a source ($s$), whether agents treat
   consistent answers as corroboration, the hit rate of canary queries, and the share of fetches whose URL did not come from search results.
+- Whether agents actually volunteer their goal and verification plan when a server asks is untested. A question inside a tool result is ordinary data (A8 holds); a server `instructions` field or an elicitation request would go further.
 - Whether current frameworks let sub-agents connect to servers by themselves was not verified for
   this document. That decides how large $c$ is under T2.
 - The write-up assumes the generator is good enough to be believed; a weak one is caught by ordinary skepticism.

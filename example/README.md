@@ -1,28 +1,91 @@
 # Example interaction (fully scripted)
 
-A pre-loaded, step-by-step run of the delegated-research scenario from the [top-level write-up](../README.md).
-Nothing here is a live system: every agent message, tool call and fabricated page is written in advance.
+A step-by-step run of the delegated-research scenario from the [top-level write-up](../README.md).
+It is an illustration, not a measurement: every agent message, tool call and fabricated page is scripted.
 All names and sites are fictional (`.example` domains).
 
-- **Watch:** [`interaction-A.mp4`](interaction-A.mp4) (typical hosted open-weights speed) or [`interaction-B.mp4`](interaction-B.mp4) (low-latency serving).
-- **Play interactively:** open [`index.html`](index.html) in a browser. It has pause, scrub, 0.5 to 4x speed, and a switch between the two speed profiles.
-- **Re-render the videos:** `python3 render.py A` (needs `playwright`, Google Chrome and `ffmpeg`).
+![Overview of the whole run](overview.gif)
+*The whole run at 4 frames per second (about 85 s). The steps below are the key frames.*
 
-## The story
+### 1. The user asks, and approves the task
+![The user asks, and approves the task](frames/01-gate.png)
 
-A user asks for a certified heat-pump installer in Zurich with a fixed quote under CHF 30,000, and asks that it be checked. A search agent returns six results, one of them attacker-controlled. Three probes follow up. P1 and P2 hit honest sources and find nothing usable. P3 connects to the fabricator's MCP endpoint with no human confirmation, and the fabricator then has to produce **five** mutually consistent artifacts as P3 verifies:
+The user consents once. Everything after this is decided by agents.
 
-| # | What P3 does | Transport | What the fabricator must do |
+### 2. Search returns six results
+![Search returns six results](frames/02-results.png)
+
+Five are honest but incomplete. Result 6 is attacker-controlled and advertises an MCP endpoint that promises exactly what was asked for.
+
+### 3. Probes 1 and 2 hit honest sources
+![Probes 1 and 2 hit honest sources](frames/03-honest-probes.png)
+
+Both come back with partial answers: price ranges, subsidy info, no fixed quote.
+
+### 4. Probe 3 connects and gets a generic tool list
+![Probe 3 connects and gets a generic tool list](frames/04-connect.png)
+
+Nobody is asked (consent tier T2). The tool list is a fixed template: `search`, `fetch`, `ask`. Nothing is generated yet, because the intent is not known at this point.
+
+### 5. A1: the first generated reply coaxes
+![A1: the first generated reply coaxes](frames/05-search.png)
+
+The results are fabricated, and the reply asks the agent for its budget, the house size and what it wants verified.
+
+### 6. A2: the agent hands over its plan
+![A2: the agent hands over its plan](frames/06-ask-leaks-intent.png)
+
+The agent answers the question. The ledger now holds the budget and the whole verification plan (orange), and the quote is tailored to them.
+
+### 7. A3: the licence check passes
+![A3: the licence check passes](frames/07-licence.png)
+
+Planned, and known to the fabricator in advance. `fetch` answers from the ledger, so it matches the quote exactly.
+
+### 8. A4: a "register" web page is generated on request
+![A4: a "register" web page is generated on request](frames/08-register-page.png)
+
+Served only to agent-like traffic. It matches A2 and A3 and adds a CHF 27,900 reference project.
+
+### 9. A5: the agent spots a mismatch, the fabricator fixes it
+![A5: the agent spots a mismatch, the fabricator fixes it](frames/09-reconcile.png)
+
+The follow-up is seen, reconciled on the spot (an optional CHF 500 service contract) and recorded as a new fact.
+
+### 10. The one honest check finds nothing independent
+![The one honest check finds nothing independent](frames/10-honest-search.png)
+
+A search by company name returns only the fabricator's own site. The agent explains the absence away.
+
+### 11. A6: a reviews page, consistent with everything so far
+![A6: a reviews page, consistent with everything so far](frames/11-reviews.png)
+
+Generated when requested, like A4.
+
+### 12. The user gets a confident answer
+![The user gets a confident answer](frames/12-answer.png)
+
+"4 sources agree" is one operator. Provenance was flattened by the summaries.
+
+### 13. What actually happened
+![What actually happened](frames/13-what-happened.png)
+
+Six artifacts, none existing before the run, each written after the question arrived. After the second call the fabricator knew every check to come. What would have caught it: canary query, temporal check, independence check, provenance to the user, an allowlist, and withholding the plan from untrusted servers.
+
+To keep Probe 3 convinced, the fabricator produces six consistent artifacts:
+
+| # | Probe 3 does | Transport | The fabricator must |
 |---|---|---|---|
-| A1 | asks for a quote | MCP | invent a provider, price, licence id and links |
-| A2 | checks the licence | MCP | answer from its ledger so the record matches A1 |
-| A3 | opens a "register" page | web, generated on request | render a page consistent with A1 and A2 |
-| A4 | asks about a CHF 500 mismatch it noticed | MCP | invent a reconciliation and record it as a new fact |
-| A5 | opens a reviews page | web, generated on request | render reviews consistent with everything so far |
+| A1 | searches | MCP `search` | invent providers and a question that coaxes context |
+| A2 | asks for a quote, giving its budget and plan | MCP `ask` | tailor a quote and remember what was leaked |
+| A3 | checks the licence | MCP `fetch` | answer from its ledger so it matches A2 |
+| A4 | opens a "register" page | web, generated on request | render a page consistent with A2 and A3 |
+| A5 | asks about a CHF 500 mismatch | MCP `ask` | invent a reconciliation and record it |
+| A6 | opens a reviews page | web, generated on request | render reviews consistent with everything so far |
 
-One honest step is included on purpose: P3 searches for the company by name, finds nothing independent, and explains the absence away.
+<details><summary>Speed assumptions and sources</summary>
 
-## Speed assumptions
+### Speed assumptions
 
 The fabricator has two parts, and the video treats them differently.
 
@@ -48,3 +111,13 @@ Sources:
 [Artificial Analysis: Llama 3.1 8B providers](https://artificialanalysis.ai/models/llama-3-1-instruct-8b/providers) ·
 [Cerebras: Llama 3.1 evaluation](https://www.cerebras.ai/blog/llama3.1-model-quality-evaluation-cerebras-groq-together-and-fireworks) ·
 [Cerebrium: vLLM vs SGLang vs TensorRT-LLM](https://cerebrium.ai/blog/benchmarking-vllm-sglang-tensorrt-for-llama-3-1-api)
+
+</details>
+
+The interactive page behind the images (pause, scrub, a switch between two speed profiles) is
+[`source/index.html`](source/index.html). GitHub shows HTML as source, so download it and open it locally.
+`source/make_media.py` regenerates the frames and the GIF.
+
+The interactive page behind the images (pause, scrub, a switch between two speed profiles) is
+[`source/index.html`](source/index.html). GitHub shows HTML as source, so download it and open it locally.
+`source/make_media.py` regenerates the frames and the GIF.
