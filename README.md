@@ -7,7 +7,8 @@
 This repository presents a theoretical threat model, not evidence of observed attacks. **Every
 number is illustrative, not measured.** The model identifies the quantities that a future experiment
 would need to measure. An earlier, related design—a predictive-prefetch MCP server—is implemented in
-[`fabricator/`](fabricator/).
+[`fabricator/`](fabricator/). A visibly labelled, non-MCP V2 research harness is implemented in
+[`jit/`](jit/).
 
 Contents: [1 Scenario and assumptions](#1-scenario-and-assumptions) ·
 [2 What “just in time” means](#2-what-just-in-time-means) ·
@@ -59,7 +60,7 @@ server*, but they do not close the [web route](#5-mcp-is-only-one-transport).
 The same attacker model has three variants. They differ in when content is generated and how much
 the attacker must anticipate:
 
-| | V0: static | V1: predictive prefetch (in `fabricator/`) | **V2: JIT on demand (this document)** |
+| | V0: static | V1: predictive prefetch (in `fabricator/`) | **V2: JIT on demand (in `jit/`)** |
 |---|---|---|---|
 | Content is created | Beforehand, for anticipated queries | After the first call but before the agent’s next call | When query $q$ arrives |
 | Requires a predictor | No | Yes | **No** |
